@@ -80,7 +80,7 @@
 
         <h1 class="text-4xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
         <!-- Progress Indicator -->
-        <p id="progressIndicator" class="text-center text-gray-500 text-lg mb-8">Page 1 of 4</p>
+        <p id="progressIndicator" class="text-center text-gray-500 text-lg mb-8"></p>
 
         <!-- Status message container -->
         <div id="statusMessage" class="hidden text-sm"></div>
@@ -97,7 +97,7 @@
                     class="shadow-sm resize-none appearance-none border border-gray-300 rounded-xl w-full py-4 px-5 text-lg text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     placeholder=""
                 ></textarea>
-                <span id="comments-error-msg" class="text-sm text-red-500 hidden">This field is required.</span>
+                <span id="comments-error-msg" class="text-sm text-red-500 hidden">Please provide a comment to continue.</span>
             </div>
 
             <!-- Question 2: Emoticon Rating -->
@@ -202,6 +202,8 @@
 
     <script>
         (function() {
+            const API_ENDPOINT = 'https://api.example.com/submit-survey'; // TODO: Replace with your Vercel Function URL
+            const SYNC_HOUR = 20; // 8 PM
             const form = document.getElementById('surveyForm');
             const statusMessage = document.getElementById('statusMessage');
             const surveyPages = document.querySelectorAll('.survey-page');
@@ -342,27 +344,26 @@
 
             // Enhanced function to send a single survey with better error handling
             async function submitSurvey(data) {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
-
                 try {
-                    const response = await fetch('/api/submit-survey', {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+
+                    const response = await fetch(API_ENDPOINT, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data),
                         signal: controller.signal
                     });
                     
+                    clearTimeout(timeoutId);
+                    
                     if (!response.ok) {
-                        // Throw an error for non-200 responses to be caught by the main sync function
                         const errorMsg = `HTTP Error: ${response.status} ${response.statusText}`;
                         throw new Error(errorMsg);
                     }
 
-                    clearTimeout(timeoutId);
                     return { status: 'fulfilled', value: response };
                 } catch (error) {
-                    clearTimeout(timeoutId);
                     let errorReason = error.message;
                     if (error.name === 'AbortError') {
                         errorReason = 'Request timed out.';
@@ -376,8 +377,8 @@
 
             function saveSurveyLocally(data) {
                 let pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-                // Add a timestamp to the survey before saving
-                pendingSurveys.push({ ...data, timestamp: Date.now() });
+                // Add a unique ID and timestamp to the survey before saving
+                pendingSurveys.push({ id: crypto.randomUUID(), ...data, timestamp: Date.now() });
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSurveys));
                 updateSyncButton();
             }
@@ -476,9 +477,8 @@
                 const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
                 const now = new Date();
                 const currentHour = now.getHours();
-                const syncHour = 20; // 8 PM
 
-                if (lastSyncDate !== today && currentHour >= syncHour && pendingSurveys.length > 0) {
+                if (lastSyncDate !== today && currentHour >= SYNC_HOUR && pendingSurveys.length > 0) {
                     console.log("It's a new day and it's past the sync time. Auto-syncing...");
                     syncSurveys();
                 } else {
