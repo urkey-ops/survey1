@@ -1,4 +1,5 @@
 {
+  "version": 2,
   "functions": {
     "api/submit-survey.js": {
       "runtime": "@vercel/node@20.0.0"
