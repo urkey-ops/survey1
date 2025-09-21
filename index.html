@@ -36,6 +36,16 @@
         .star-rating input[type="radio"]:checked ~ label.star:hover {
             color: #fcd34d; /* Tailwind's amber-300 */
         }
+        /* Style for validation error highlight */
+        .error-highlight {
+            border-color: #ef4444; /* Tailwind's red-500 */
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -49,8 +59,9 @@
             <span id="syncCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
         </button>
 
-        <h1 class="text-4xl font-bold text-center text-gray-800 mb-4">Customer Feedback</h1>
-        <p class="text-center text-gray-500 text-lg mb-8">We'd love to hear about your experience.</p>
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
+        <!-- Progress Indicator -->
+        <p id="progressIndicator" class="text-center text-gray-500 text-lg mb-8">Page 1 of 4</p>
 
         <!-- Status message container -->
         <div id="statusMessage" class="hidden text-sm"></div>
@@ -159,7 +170,7 @@
                 <button
                     id="nextButton"
                     type="button"
-                    class="px-8 py-4 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
+                    class="px-8 py-4 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                 >
                     Next
                 </button>
@@ -175,6 +186,7 @@
         const backButton = document.getElementById('backButton');
         const syncButton = document.getElementById('syncButton');
         const syncCount = document.getElementById('syncCount');
+        const progressIndicator = document.getElementById('progressIndicator');
         const LOCAL_STORAGE_KEY = 'pending-surveys';
 
         let currentPage = 0;
@@ -187,6 +199,9 @@
                 page.classList.toggle('hidden', index !== pageIndex);
             });
 
+            // Update progress indicator
+            progressIndicator.textContent = `Question ${pageIndex + 1} of ${surveyPages.length}`;
+
             // Update navigation buttons
             backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
             if (pageIndex === surveyPages.length - 1) {
@@ -196,11 +211,23 @@
             }
         }
 
+        function clearValidationErrors() {
+            surveyPages.forEach(page => {
+                page.classList.remove('error-highlight');
+                const inputs = page.querySelectorAll('input, textarea');
+                inputs.forEach(input => input.classList.remove('error-highlight'));
+            });
+        }
+
         function validatePage(pageElement) {
             // Check for textarea validation
             const textarea = pageElement.querySelector('textarea');
             if (textarea && textarea.required && !textarea.value.trim()) {
+                textarea.classList.add('error-highlight');
                 return false;
+            }
+            if (textarea) {
+                textarea.classList.remove('error-highlight');
             }
 
             // Check for radio button validation
@@ -208,9 +235,11 @@
             if (radioButtons.length > 0) {
                 const isChecked = Array.from(radioButtons).some(radio => radio.checked);
                 if (!isChecked) {
+                    pageElement.classList.add('error-highlight');
                     return false;
                 }
             }
+            pageElement.classList.remove('error-highlight');
             return true;
         }
 
@@ -250,12 +279,21 @@
             }
         }
 
+        function setButtonsDisabled(disabled) {
+            nextButton.disabled = disabled;
+            syncButton.disabled = disabled;
+            // Add a class for visual feedback when disabled
+            nextButton.classList.toggle('disabled:bg-gray-400', disabled);
+        }
+
         async function syncSurveys() {
+            setButtonsDisabled(true); // Disable buttons during sync
             const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
             if (pendingSurveys.length === 0) {
                 statusMessage.textContent = 'No surveys to sync.';
                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-gray-100 text-gray-700 font-medium';
                 statusMessage.style.display = 'block';
+                setButtonsDisabled(false); // Re-enable buttons
                 return;
             }
             
@@ -287,10 +325,13 @@
                 statusMessage.textContent = 'Failed to sync. Please check your internet connection and try again.';
                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
             }
+
+            setButtonsDisabled(false); // Re-enable buttons after sync completes
         }
 
         // Add event listeners for navigation
         nextButton.addEventListener('click', () => {
+            clearValidationErrors();
             const currentPageElement = surveyPages[currentPage];
             if (!validatePage(currentPageElement)) {
                 statusMessage.textContent = 'Please answer the current question to continue.';
@@ -331,6 +372,9 @@
 
         // The form submission logic is now a separate function
         async function submitForm() {
+            setButtonsDisabled(true); // Disable buttons during submission
+            clearValidationErrors(); // Clear any previous errors
+            
             // Clear any previous messages
             statusMessage.style.display = 'none';
 
@@ -367,6 +411,8 @@
                 showPage(currentPage);
                 // The updateSyncButton() is now called from inside saveSurveyLocally
             }
+
+            setButtonsDisabled(false); // Re-enable buttons after submission attempt
         }
 
         // Handle the final form submission
@@ -378,7 +424,7 @@
 
         // Initialize the survey on page load
         showPage(currentPage);
-        // Do not call updateSyncButton() on load to keep the count hidden
+        updateSyncButton();
     </script>
 </body>
 </html>
