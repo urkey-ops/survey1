@@ -177,10 +177,8 @@
             backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
             if (pageIndex === surveyPages.length - 1) {
                 nextButton.textContent = 'Submit Survey';
-                nextButton.type = 'submit';
             } else {
                 nextButton.textContent = 'Next';
-                nextButton.type = 'button';
             }
         }
 
@@ -216,6 +214,9 @@
             if (currentPage < surveyPages.length - 1) {
                 currentPage++;
                 showPage(currentPage);
+            } else {
+                // Manually trigger form submission logic
+                submitForm();
             }
         });
 
@@ -226,10 +227,8 @@
             }
         });
 
-        // Handle the final form submission
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
+        // The form submission logic is now a separate function
+        async function submitForm() {
             // Clear any previous messages
             statusMessage.style.display = 'none';
 
@@ -270,6 +269,13 @@
                 statusMessage.textContent = 'Error: Could not connect to the server.';
                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
             }
+        }
+
+        // Handle the final form submission
+        form.addEventListener('submit', (e) => {
+             e.preventDefault();
+             // The next button click event handles the submission, so we prevent default here
+             // to avoid double-submission on some browsers.
         });
 
         // Initialize the survey on page load
