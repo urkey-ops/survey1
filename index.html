@@ -95,7 +95,7 @@
                     name="comments"
                     rows="5"
                     class="shadow-sm resize-none appearance-none border border-gray-300 rounded-xl w-full py-4 px-5 text-lg text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    placeholder="Type your comments here..."
+                    placeholder=""
                 ></textarea>
                 <span id="comments-error-msg" class="text-sm text-red-500 hidden">This field is required.</span>
             </div>
@@ -225,6 +225,67 @@
                 '3': { type: 'radio', name: 'staff_friendliness', msgId: 'staff_friendliness-error-msg' }
             };
 
+            // Dynamic questions for the comments section
+            const dynamicQuestions = [
+                'How was your visit to BAPS today?',
+                'Did you feel welcomed during your visit?',
+                'How was your experience with our volunteers?',
+                'What touched your heart during your visit?',
+                'Any suggestions to improve your experience?'
+            ];
+            let questionIndex = 0;
+            let typingTimeout;
+            let cycleInterval;
+            let userTyping = false;
+
+            // This function handles the typewriter animation for the comment box
+            function typePlaceholder(text, element) {
+                let charIndex = 0;
+                
+                function type() {
+                    if (userTyping) {
+                        clearInterval(typingTimeout);
+                        return;
+                    }
+                    if (charIndex < text.length) {
+                        element.value += text.charAt(charIndex);
+                        charIndex++;
+                        typingTimeout = setTimeout(type, 50); // Typing speed
+                    }
+                }
+                type();
+            }
+
+            // This function cycles through the questions
+            function startQuestionCycle() {
+                clearInterval(cycleInterval);
+                const commentsTextArea = document.getElementById('comments');
+                commentsTextArea.value = ''; // Force clear the value before starting the new animation
+                
+                cycleInterval = setInterval(() => {
+                    if (!userTyping) {
+                        commentsTextArea.value = ''; // Ensure it's cleared before typing the next one
+                        typePlaceholder(dynamicQuestions[questionIndex], commentsTextArea);
+                        questionIndex = (questionIndex + 1) % dynamicQuestions.length;
+                    }
+                }, 6000); // 5 seconds for question display + 1 second buffer
+            }
+
+            // Event listener to stop animation when user starts typing
+            document.getElementById('comments').addEventListener('input', () => {
+                userTyping = true;
+                clearInterval(typingTimeout);
+                clearInterval(cycleInterval);
+            });
+
+            // Re-start the animation if the user clears the text area
+            document.getElementById('comments').addEventListener('focus', () => {
+                if (document.getElementById('comments').value === '') {
+                    userTyping = false;
+                    startQuestionCycle();
+                }
+            });
+
             function showPage(pageIndex) {
                 surveyPages.forEach((page, index) => {
                     page.classList.toggle('hidden', index !== pageIndex);
@@ -237,6 +298,15 @@
                     nextButton.textContent = 'Submit Survey';
                 } else {
                     nextButton.textContent = 'Next';
+                }
+
+                // Start or stop the placeholder animation based on the current page
+                if (pageIndex === 0) {
+                    userTyping = false;
+                    startQuestionCycle();
+                } else {
+                    clearInterval(typingTimeout);
+                    clearInterval(cycleInterval);
                 }
             }
 
