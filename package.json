@@ -4,5 +4,8 @@
   "description": "A Vercel Function for the survey app.",
   "dependencies": {
     "googleapis": "^128.0.0"
+  },
+  "engines": {
+    "node": "20.x"
   }
 }
