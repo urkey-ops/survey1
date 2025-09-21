@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 
 // The name of the Google Sheet, must be exactly as it appears in Google Sheets.
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
+const SPREADSHEET_ID = '1Bgqi9ZgBduqg-Q7f0Pbhqq2at85-Ba0CgHylrABtG_U';
 const SHEET_NAME = 'Sheet1'; // Or whatever your sheet tab is named
 
 // Initialize the Google Sheets API client
