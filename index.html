@@ -188,11 +188,11 @@
         const syncCount = document.getElementById('syncCount');
         const progressIndicator = document.getElementById('progressIndicator');
         const LOCAL_STORAGE_KEY = 'pending-surveys';
+        const LAST_SYNC_KEY = 'last-sync-date';
+        const SYNC_PASSWORD = '1111';
 
         let currentPage = 0;
-
-        // The hardcoded password for syncing
-        const SYNC_PASSWORD = '1111';
+        let isSyncing = false; // Flag to prevent concurrent syncs
 
         function showPage(pageIndex) {
             surveyPages.forEach((page, index) => {
@@ -220,7 +220,6 @@
         }
 
         function validatePage(pageElement) {
-            // Check for textarea validation
             const textarea = pageElement.querySelector('textarea');
             if (textarea && textarea.required && !textarea.value.trim()) {
                 textarea.classList.add('error-highlight');
@@ -230,7 +229,6 @@
                 textarea.classList.remove('error-highlight');
             }
 
-            // Check for radio button validation
             const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
             if (radioButtons.length > 0) {
                 const isChecked = Array.from(radioButtons).some(radio => radio.checked);
@@ -252,10 +250,7 @@
                     },
                     body: JSON.stringify(data)
                 });
-                if (!response.ok) {
-                    throw new Error('Server error: ' + response.statusText);
-                }
-                return true;
+                return response.ok;
             } catch (error) {
                 console.error('Submission failed:', error);
                 return false;
@@ -266,7 +261,7 @@
             let pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
             pendingSurveys.push(data);
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSurveys));
-            // Do not call updateSyncButton here, it's called after password check
+            updateSyncButton();
         }
 
         function updateSyncButton() {
@@ -282,51 +277,87 @@
         function setButtonsDisabled(disabled) {
             nextButton.disabled = disabled;
             syncButton.disabled = disabled;
-            // Add a class for visual feedback when disabled
             nextButton.classList.toggle('disabled:bg-gray-400', disabled);
         }
 
         async function syncSurveys() {
-            setButtonsDisabled(true); // Disable buttons during sync
-            const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-            if (pendingSurveys.length === 0) {
-                statusMessage.textContent = 'No surveys to sync.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-gray-100 text-gray-700 font-medium';
-                statusMessage.style.display = 'block';
-                setButtonsDisabled(false); // Re-enable buttons
+            if (isSyncing) {
+                console.log("Sync already in progress. Skipping.");
                 return;
             }
-            
-            statusMessage.textContent = `Syncing ${pendingSurveys.length} saved survey(s)...`;
-            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-blue-100 text-blue-700 font-medium';
-            statusMessage.style.display = 'block';
+            isSyncing = true;
+            setButtonsDisabled(true);
 
-            let successfullySynced = 0;
-            for (let i = 0; i < pendingSurveys.length; i++) {
-                const data = pendingSurveys[i];
-                const success = await submitSurvey(data);
+            const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+            if (pendingSurveys.length === 0) {
+                showStatus('gray', 'No surveys to sync.');
+                isSyncing = false;
+                setButtonsDisabled(false);
+                return;
+            }
+
+            showStatus('blue', `Attempting to sync ${pendingSurveys.length} survey(s)...`);
+
+            let successCount = 0;
+            const failedSurveys = [];
+
+            for (const survey of pendingSurveys) {
+                const success = await submitSurvey(survey);
                 if (success) {
-                    successfullySynced++;
+                    successCount++;
                 } else {
-                    // Stop syncing if one fails, leave the rest for the next time
-                    break;
+                    failedSurveys.push(survey);
                 }
             }
             
-            // Remove the successfully synced surveys from the queue
-            const newPendingSurveys = pendingSurveys.slice(successfullySynced);
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newPendingSurveys));
+            // Save only the failed surveys back to local storage
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(failedSurveys));
             updateSyncButton();
-            
-            if (successfullySynced > 0) {
-                 statusMessage.textContent = `Synced ${successfullySynced} survey(s) successfully!`;
-                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
-            } else {
-                statusMessage.textContent = 'Failed to sync. Please check your internet connection and try again.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+
+            // Update the last sync date only if at least one survey was synced successfully
+            if (successCount > 0) {
+                const today = new Date().toLocaleDateString();
+                localStorage.setItem(LAST_SYNC_KEY, today);
             }
 
-            setButtonsDisabled(false); // Re-enable buttons after sync completes
+            // Provide detailed feedback
+            if (failedSurveys.length === 0) {
+                showStatus('green', `All ${successCount} surveys synced successfully!`);
+            } else {
+                showStatus('red', `${successCount} surveys synced, ${failedSurveys.length} failed. They will be retried later.`);
+            }
+
+            isSyncing = false;
+            setButtonsDisabled(false);
+        }
+
+        function showStatus(color, message) {
+            const classes = {
+                'gray': 'bg-gray-100 text-gray-700 font-medium',
+                'blue': 'bg-blue-100 text-blue-700 font-medium',
+                'green': 'bg-green-100 text-green-700 font-medium',
+                'red': 'bg-red-100 text-red-700 font-medium'
+            };
+            statusMessage.className = `block p-4 mb-4 rounded-xl text-center ${classes[color]}`;
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+        }
+        
+        // New function to check for daily automatic sync based on time
+        function checkAndAutoSync() {
+            const lastSyncDate = localStorage.getItem(LAST_SYNC_KEY);
+            const today = new Date().toLocaleDateString();
+            const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+            const now = new Date();
+            const currentHour = now.getHours();
+            const syncHour = 20; // 8 PM
+
+            if (lastSyncDate !== today && currentHour >= syncHour && pendingSurveys.length > 0) {
+                console.log("It's a new day and it's past the sync time. Auto-syncing...");
+                syncSurveys();
+            } else {
+                console.log("Auto-sync conditions not met. Skipping.");
+            }
         }
 
         // Add event listeners for navigation
@@ -334,18 +365,15 @@
             clearValidationErrors();
             const currentPageElement = surveyPages[currentPage];
             if (!validatePage(currentPageElement)) {
-                statusMessage.textContent = 'Please answer the current question to continue.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                statusMessage.style.display = 'block';
+                showStatus('red', 'Please answer the current question to continue.');
                 return;
             }
-            statusMessage.style.display = 'none'; // Hide message on success
+            statusMessage.style.display = 'none';
 
             if (currentPage < surveyPages.length - 1) {
                 currentPage++;
                 showPage(currentPage);
             } else {
-                // Manually trigger form submission logic
                 submitForm();
             }
         });
@@ -360,25 +388,16 @@
         syncButton.addEventListener('click', () => {
             const password = prompt("Enter the 4-digit password to sync surveys:");
             if (password === SYNC_PASSWORD) {
-                updateSyncButton();
                 syncSurveys();
             } else if (password !== null) {
-                // User didn't cancel, but entered the wrong password
-                statusMessage.textContent = 'Incorrect password. Sync failed.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                statusMessage.style.display = 'block';
+                showStatus('red', 'Incorrect password. Sync failed.');
             }
         });
 
-        // The form submission logic is now a separate function
         async function submitForm() {
-            setButtonsDisabled(true); // Disable buttons during submission
-            clearValidationErrors(); // Clear any previous errors
+            setButtonsDisabled(true);
+            clearValidationErrors();
             
-            // Clear any previous messages
-            statusMessage.style.display = 'none';
-
-            // Collect data from all form fields
             const formData = new FormData(form);
             const data = {
                 comments: formData.get('comments'),
@@ -387,44 +406,27 @@
                 staff_friendliness: formData.get('staff_friendliness')
             };
 
-            statusMessage.textContent = 'Submitting survey...';
-            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
-            statusMessage.style.display = 'block';
+            saveSurveyLocally(data);
 
-            const success = await submitSurvey(data);
+            showStatus('blue', 'Survey saved locally. It will be synced later.');
 
-            if (success) {
-                statusMessage.textContent = 'Survey submitted successfully! Thank you.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
-                form.reset();
-                currentPage = 0; // Reset survey to the first page
-                showPage(currentPage);
-                // Also update the button to reflect the new state (e.g., if there are still pending)
-                updateSyncButton();
-            } else {
-                // Submission failed, save it locally and inform the user
-                saveSurveyLocally(data);
-                statusMessage.textContent = 'No internet. Survey saved locally and will be sent when you sync.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                form.reset();
-                currentPage = 0;
-                showPage(currentPage);
-                // The updateSyncButton() is now called from inside saveSurveyLocally
-            }
-
-            setButtonsDisabled(false); // Re-enable buttons after submission attempt
+            form.reset();
+            currentPage = 0;
+            showPage(currentPage);
+            setButtonsDisabled(false);
         }
 
-        // Handle the final form submission
         form.addEventListener('submit', (e) => {
              e.preventDefault();
-             // The next button click event handles the submission, so we prevent default here
-             // to avoid double-submission on some browsers.
         });
 
         // Initialize the survey on page load
         showPage(currentPage);
         updateSyncButton();
+        checkAndAutoSync();
+        
+        // Periodically check for auto-sync every hour
+        setInterval(checkAndAutoSync, 60 * 60 * 1000); 
     </script>
 </body>
 </html>
