@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Feedback Survey</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
@@ -65,7 +66,7 @@
             <div class="survey-page hidden" data-page="1">
                 <label class="block text-gray-700 font-semibold mb-2">2. Overall, how satisfied were you with your visit today?</label>
                 <div class="flex justify-around items-center space-x-4">
-                    <input type="radio" id="emojiSad" name="satisfaction" value="Sad" class="hidden" required>
+                    <input type="radio" id="emojiSad" name="satisfaction" value="Sad" class="hidden">
                     <label for="emojiSad" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
                         <span class="text-4xl sm:text-5xl">😞</span>
                         <span class="mt-2 text-gray-500 text-xs sm:text-sm">Sad</span>
@@ -91,7 +92,7 @@
                 <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
                     <span class="text-xs text-gray-500">1 (Poor)</span>
                     <div class="flex space-x-2">
-                        <input type="radio" id="clean1" name="cleanliness" value="1" class="hidden" required>
+                        <input type="radio" id="clean1" name="cleanliness" value="1" class="hidden">
                         <label for="clean1" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">1</label>
                         
                         <input type="radio" id="clean2" name="cleanliness" value="2" class="hidden">
@@ -103,7 +104,7 @@
                         <input type="radio" id="clean4" name="cleanliness" value="4" class="hidden">
                         <label for="clean4" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
                         
-                        <input type="radio" id="clean5" name="cleaniness" value="5" class="hidden">
+                        <input type="radio" id="clean5" name="cleanliness" value="5" class="hidden">
                         <label for="clean5" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
                     </div>
                     <span class="text-xs text-gray-500">5 (Excellent)</span>
@@ -114,7 +115,7 @@
             <div class="survey-page hidden" data-page="3">
                 <label class="block text-gray-700 font-semibold mb-2">4. How friendly was the volunteer staff?</label>
                 <div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">
-                    <input type="radio" id="star5" name="staff_friendliness" value="5" required>
+                    <input type="radio" id="star5" name="staff_friendliness" value="5">
                     <label for="star5" class="star">
                         <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
