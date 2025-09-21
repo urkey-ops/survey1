@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/submit-survey.js": {
-      "runtime": "@vercel/node@20.x"
+      "runtime": "@vercel/node@20.0.0"
     }
   },
   "rewrites": [
