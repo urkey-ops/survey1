@@ -211,6 +211,7 @@
             const syncCount = document.getElementById('syncCount');
             const syncLoading = document.getElementById('syncLoading');
             const progressIndicator = document.getElementById('progressIndicator');
+            const commentsTextArea = document.getElementById('comments');
             const LOCAL_STORAGE_KEY = 'pending-surveys';
             const LAST_SYNC_KEY = 'last-sync-date';
 
@@ -259,7 +260,6 @@
             // This function cycles through the questions
             function startQuestionCycle() {
                 clearInterval(cycleInterval);
-                const commentsTextArea = document.getElementById('comments');
                 commentsTextArea.value = ''; // Force clear the value before starting the new animation
                 
                 cycleInterval = setInterval(() => {
@@ -271,19 +271,19 @@
                 }, 6000); // 5 seconds for question display + 1 second buffer
             }
 
-            // Event listener to stop animation when user starts typing
-            document.getElementById('comments').addEventListener('input', () => {
+            // New event listener to clear the textarea on focus and stop animations
+            commentsTextArea.addEventListener('focus', () => {
+                commentsTextArea.value = '';
                 userTyping = true;
                 clearInterval(typingTimeout);
                 clearInterval(cycleInterval);
             });
 
-            // Re-start the animation if the user clears the text area
-            document.getElementById('comments').addEventListener('focus', () => {
-                if (document.getElementById('comments').value === '') {
-                    userTyping = false;
-                    startQuestionCycle();
-                }
+            // Keep the input event listener as a secondary safeguard
+            commentsTextArea.addEventListener('input', () => {
+                userTyping = true;
+                clearInterval(typingTimeout);
+                clearInterval(cycleInterval);
             });
 
             function showPage(pageIndex) {
