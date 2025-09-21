@@ -1,15 +1,20 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/submit-survey.js",
-      "use": "@vercel/node"
+  "functions": {
+    "api/submit-survey.js": {
+      "runtime": "nodejs18.x"
     }
-  ],
+  },
   "rewrites": [
     {
       "source": "/api/submit-survey",
       "destination": "/api/submit-survey.js"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/index.html",
+      "permanent": true
     }
   ],
   "headers": [
