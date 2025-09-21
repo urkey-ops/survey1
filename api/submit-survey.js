@@ -1,7 +1,7 @@
 const { google } = require('googleapis');
 
-// The name of the Google Sheet, must be exactly as it appears in Google Sheets.
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID';
+// Pull the Spreadsheet ID directly from Vercel's environment variables
+const SPREADSHEET_ID = process.env.SPREADSHEET_ID;
 const SHEET_NAME = 'Sheet1'; // Or whatever your sheet tab is named
 
 // Initialize the Google Sheets API client
@@ -29,14 +29,21 @@ module.exports = async (request, response) => {
         return response.status(405).json({ message: "Method Not Allowed" });
     }
 
+    // Check if the Spreadsheet ID is set
+    if (!SPREADSHEET_ID) {
+        console.error("SPREADSHEET_ID environment variable is not set.");
+        return response.status(500).json({ message: "Server configuration error: SPREADSHEET_ID not found." });
+    }
+
     try {
         const data = request.body;
         console.log("Received survey submission:", data);
 
         const sheets = await getGoogleSheetsClient();
         
-        // Define the row to append, ensuring the order matches your Google Sheet columns
-        const row = [data.name, data.email, data.comment, new Date().toISOString()];
+        // Define the row to append, ensuring the order matches the data received from the client
+        // The order should be: comments, satisfaction, cleanliness, staff_friendliness
+        const row = [data.comments, data.satisfaction, data.cleanliness, data.staff_friendliness, new Date().toISOString()];
 
         await sheets.spreadsheets.values.append({
             spreadsheetId: SPREADSHEET_ID,
