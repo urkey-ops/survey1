@@ -40,31 +40,31 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
 
-    <div class="relative w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl">
+    <div class="relative w-full max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-2xl shadow-xl">
         <!-- Manual Sync Button (moved to top-right corner) -->
         <button id="syncButton" class="absolute top-4 right-4 z-10 p-2 rounded-full text-purple-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.012 3.96l.707-.707m2.228 2.228.707-.707m-5.496-5.496l-.707-.707m-1.728-1.728l-.707-.707M10 13a4 4 0 11-4-4m4 4v5m-4-5l.707-.707m2.228 2.228.707-.707m-5.496-5.496l-.707-.707m-1.728-1.728l-.707-.707" />
             </svg>
             <span id="syncCount" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
         </button>
 
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
-        <p class="text-center text-gray-500 mb-6">We'd love to hear about your experience.</p>
+        <h1 class="text-4xl font-bold text-center text-gray-800 mb-4">Customer Feedback</h1>
+        <p class="text-center text-gray-500 text-lg mb-8">We'd love to hear about your experience.</p>
 
         <!-- Status message container -->
         <div id="statusMessage" class="hidden text-sm"></div>
 
-        <form id="surveyForm" class="space-y-6">
+        <form id="surveyForm" class="space-y-8">
 
             <!-- Question 1: Text -->
             <div class="survey-page" data-page="0">
-                <label for="comments" class="block text-gray-700 font-semibold mb-2">1. Write us about your experience today. Any comment or suggestion?</label>
+                <label for="comments" class="block text-gray-700 text-xl font-semibold mb-2">1. Write us about your experience today. Any comment or suggestion?</label>
                 <textarea
                     id="comments"
                     name="comments"
-                    rows="4"
-                    class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    rows="5"
+                    class="shadow-sm resize-none appearance-none border border-gray-300 rounded-xl w-full py-4 px-5 text-lg text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                     placeholder="Type your comments here..."
                     required
                 ></textarea>
@@ -72,86 +72,86 @@
 
             <!-- Question 2: Emoticon Rating -->
             <div class="survey-page hidden" data-page="1">
-                <label class="block text-gray-700 font-semibold mb-2">2. Overall, how satisfied were you with your visit today?</label>
-                <div class="flex justify-around items-center space-x-4">
+                <label class="block text-gray-700 text-xl font-semibold mb-2">2. Overall, how satisfied were you with your visit today?</label>
+                <div class="flex justify-around items-center space-x-6">
                     <input type="radio" id="emojiSad" name="satisfaction" value="Sad" class="hidden">
-                    <label for="emojiSad" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                        <span class="text-4xl sm:text-5xl">😞</span>
-                        <span class="mt-2 text-gray-500 text-xs sm:text-sm">Sad</span>
+                    <label for="emojiSad" class="flex flex-col items-center p-6 sm:p-8 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
+                        <span class="text-5xl sm:text-6xl">😞</span>
+                        <span class="mt-2 text-gray-500 text-base sm:text-lg">Sad</span>
                     </label>
 
                     <input type="radio" id="emojiNeutral" name="satisfaction" value="Neutral" class="hidden">
-                    <label for="emojiNeutral" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                        <span class="text-4xl sm:text-5xl">😐</span>
-                        <span class="mt-2 text-gray-500 text-xs sm:text-sm">Neutral</span>
+                    <label for="emojiNeutral" class="flex flex-col items-center p-6 sm:p-8 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
+                        <span class="text-5xl sm:text-6xl">😐</span>
+                        <span class="mt-2 text-gray-500 text-base sm:text-lg">Neutral</span>
                     </label>
 
                     <input type="radio" id="emojiHappy" name="satisfaction" value="Happy" class="hidden">
-                    <label for="emojiHappy" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                        <span class="text-4xl sm:text-5xl">😊</span>
-                        <span class="mt-2 text-gray-500 text-xs sm:text-sm">Happy</span>
+                    <label for="emojiHappy" class="flex flex-col items-center p-6 sm:p-8 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
+                        <span class="text-5xl sm:text-6xl">😊</span>
+                        <span class="mt-2 text-gray-500 text-base sm:text-lg">Happy</span>
                     </label>
                 </div>
             </div>
 
             <!-- Question 3: Linear Scale -->
             <div class="survey-page hidden" data-page="2">
-                <label class="block text-gray-700 font-semibold mb-2">3. How would you rate the cleanliness of the facility?</label>
-                <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
-                    <span class="text-xs text-gray-500">1 (Poor)</span>
-                    <div class="flex space-x-2">
+                <label class="block text-gray-700 text-xl font-semibold mb-2">3. How would you rate the cleanliness of the facility?</label>
+                <div class="flex justify-between items-center bg-gray-50 rounded-lg p-6">
+                    <span class="text-sm text-gray-500">1 (Poor)</span>
+                    <div class="flex space-x-4">
                         <input type="radio" id="clean1" name="cleanliness" value="1" class="hidden">
-                        <label for="clean1" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">1</label>
+                        <label for="clean1" class="w-12 h-12 flex items-center justify-center text-lg font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">1</label>
                         
                         <input type="radio" id="clean2" name="cleanliness" value="2" class="hidden">
-                        <label for="clean2" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">2</label>
+                        <label for="clean2" class="w-12 h-12 flex items-center justify-center text-lg font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">2</label>
                         
                         <input type="radio" id="clean3" name="cleanliness" value="3" class="hidden">
-                        <label for="clean3" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">3</label>
+                        <label for="clean3" class="w-12 h-12 flex items-center justify-center text-lg font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">3</label>
                         
                         <input type="radio" id="clean4" name="cleanliness" value="4" class="hidden">
-                        <label for="clean4" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
+                        <label for="clean4" class="w-12 h-12 flex items-center justify-center text-lg font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
                         
                         <input type="radio" id="clean5" name="cleanliness" value="5" class="hidden">
-                        <label for="clean5" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
+                        <label for="clean5" class="w-12 h-12 flex items-center justify-center text-lg font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
                     </div>
-                    <span class="text-xs text-gray-500">5 (Excellent)</span>
+                    <span class="text-sm text-gray-500">5 (Excellent)</span>
                 </div>
             </div>
 
             <!-- Question 4: Star Rating -->
             <div class="survey-page hidden" data-page="3">
-                <label class="block text-gray-700 font-semibold mb-2">4. How friendly was the volunteer staff?</label>
-                <div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">
+                <label class="block text-gray-700 text-xl font-semibold mb-2">4. How friendly was the volunteer staff?</label>
+                <div class="star-rating flex flex-row-reverse justify-end space-x-2 sm:space-x-4">
                     <input type="radio" id="star5" name="staff_friendliness" value="5">
                     <label for="star5" class="star">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
                     <input type="radio" id="star4" name="staff_friendliness" value="4">
                     <label for="star4" class="star">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
                     <input type="radio" id="star3" name="staff_friendliness" value="3">
                     <label for="star3" class="star">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
                     <input type="radio" id="star2" name="staff_friendliness" value="2">
                     <label for="star2" class="star">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
                     <input type="radio" id="star1" name="staff_friendliness" value="1">
                     <label for="star1" class="star">
-                        <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                        <svg class="w-10 h-10 sm:w-12 sm:h-12 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                     </label>
                 </div>
             </div>
 
             <!-- Navigation Buttons -->
-            <div id="survey-navigation" class="flex justify-between items-center mt-6">
+            <div id="survey-navigation" class="flex justify-between items-center mt-8">
                 <button
                     id="backButton"
                     type="button"
-                    class="px-6 py-3 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors"
+                    class="px-8 py-4 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors"
                     style="visibility: hidden;"
                 >
                     Back
@@ -159,7 +159,7 @@
                 <button
                     id="nextButton"
                     type="button"
-                    class="px-6 py-3 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
+                    class="px-8 py-4 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
                 >
                     Next
                 </button>
