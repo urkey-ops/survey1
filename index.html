@@ -103,7 +103,7 @@
                         <input type="radio" id="clean4" name="cleanliness" value="4" class="hidden">
                         <label for="clean4" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
                         
-                        <input type="radio" id="clean5" name="cleanliness" value="5" class="hidden">
+                        <input type="radio" id="clean5" name="cleaniness" value="5" class="hidden">
                         <label for="clean5" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
                     </div>
                     <span class="text-xs text-gray-500">5 (Excellent)</span>
@@ -183,16 +183,34 @@
             }
         }
 
+        function validatePage(pageElement) {
+            // Check for textarea validation
+            const textarea = pageElement.querySelector('textarea');
+            if (textarea && textarea.required && !textarea.value.trim()) {
+                return false;
+            }
+
+            // Check for radio button validation
+            const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
+            if (radioButtons.length > 0) {
+                const isChecked = Array.from(radioButtons).some(radio => radio.checked);
+                if (!isChecked) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // Add event listeners for navigation
         nextButton.addEventListener('click', () => {
-            // Validate the current page's input before moving forward
             const currentPageElement = surveyPages[currentPage];
-            if (!currentPageElement.querySelector(':valid')) {
-                // If a required field is not filled, let the browser handle validation
-                currentPageElement.querySelector(':invalid').focus();
-                form.reportValidity();
+            if (!validatePage(currentPageElement)) {
+                statusMessage.textContent = 'Please answer the current question to continue.';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+                statusMessage.style.display = 'block';
                 return;
             }
+            statusMessage.style.display = 'none'; // Hide message on success
 
             if (currentPage < surveyPages.length - 1) {
                 currentPage++;
