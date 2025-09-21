@@ -58,24 +58,45 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        /* Fade-in animation for the thank you screen */
+        .fade-in {
+            animation: fadeIn 0.5s forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .relative-container {
+            position: relative;
+        }
+        #typing-text-container {
+            position: absolute;
+            top: 1rem;
+            left: 1.25rem;
+            right: 1.25rem;
+            color: #9ca3af; /* Tailwind gray-400 */
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+            white-space: pre;
+            overflow: hidden;
+            pointer-events: none; /* Make it clickable through */
+            z-index: 10;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
 
-    <div class="relative w-full max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-2xl shadow-xl">
+    <div id="surveyContainer" class="relative w-full max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-2xl shadow-xl">
         <!-- Manual Sync Button and Loading Indicator -->
-        <div class="absolute top-4 right-4 z-10 flex items-center">
+        <div class="absolute top-4 right-4 z-10 flex items-center" id="syncContainer">
             <button id="syncButton" class="group px-4 py-2 rounded-full text-purple-600 font-semibold text-sm hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-colors flex items-center space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg id="syncIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:rotate-180 transition-transform duration-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.012 3.96l.707-.707m2.228 2.228.707-.707m-5.496-5.496l-.707-.707m-1.728-1.728l-.707-.707M10 13a4 4 0 11-4-4m4 4v5m-4-5l.707-.707m2.228 2.228.707-.707m-5.496-5.496l-.707-.707m-1.728-1.728l-.707-.707" />
                 </svg>
+                <div id="syncSpinner" class="hidden spinner"></div>
                 <span>Sync Now</span>
                 <span id="syncCount" class="absolute -top-1 right-1 bg-red-500 text-white text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
             </button>
-            <!-- Loading Indicator -->
-            <div id="syncLoading" class="hidden flex items-center justify-center p-2">
-                <div class="spinner"></div>
-            </div>
         </div>
 
         <h1 class="text-4xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
@@ -90,13 +111,16 @@
             <!-- Question 1: Text -->
             <div class="survey-page" data-page="0">
                 <label for="comments" class="block text-gray-700 text-xl font-semibold mb-2">1. Write us about your experience today. Any comment or suggestion?</label>
-                <textarea
-                    id="comments"
-                    name="comments"
-                    rows="5"
-                    class="shadow-sm resize-none appearance-none border border-gray-300 rounded-xl w-full py-4 px-5 text-lg text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                    placeholder=""
-                ></textarea>
+                <div class="relative-container">
+                    <div id="typing-text-container"></div>
+                    <textarea
+                        id="comments"
+                        name="comments"
+                        rows="5"
+                        class="shadow-sm resize-none appearance-none border border-gray-300 rounded-xl w-full py-4 px-5 text-lg text-gray-700 leading-tight bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                        placeholder=""
+                    ></textarea>
+                </div>
                 <span id="comments-error-msg" class="text-sm text-red-500 hidden">Please provide a comment to continue.</span>
             </div>
 
@@ -200,6 +224,17 @@
         </form>
     </div>
 
+    <!-- Thank You Screen -->
+    <div id="thankYouScreen" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center p-8 text-center fade-in">
+        <div class="flex flex-col items-center">
+            <svg class="h-20 w-20 text-green-500 mb-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <h2 class="text-4xl sm:text-5xl font-extrabold text-gray-800 mb-2">Thank you!</h2>
+            <p class="text-lg text-gray-600 mb-8">Your feedback has been saved and is greatly appreciated.</p>
+        </div>
+    </div>
+
     <script>
         (function() {
             const API_ENDPOINT = 'https://api.example.com/submit-survey'; // TODO: Replace with your Vercel Function URL
@@ -210,12 +245,31 @@
             const nextButton = document.getElementById('nextButton');
             const backButton = document.getElementById('backButton');
             const syncButton = document.getElementById('syncButton');
+            const syncContainer = document.getElementById('syncContainer');
+            const syncIcon = document.getElementById('syncIcon');
+            const syncSpinner = document.getElementById('syncSpinner');
             const syncCount = document.getElementById('syncCount');
-            const syncLoading = document.getElementById('syncLoading');
             const progressIndicator = document.getElementById('progressIndicator');
             const commentsTextArea = document.getElementById('comments');
+            const typingTextContainer = document.getElementById('typing-text-container');
+            const thankYouScreen = document.getElementById('thankYouScreen');
             const LOCAL_STORAGE_KEY = 'pending-surveys';
             const LAST_SYNC_KEY = 'last-sync-date';
+
+            // List of questions to rotate in the placeholder
+            const placeholderQuestions = [
+                "How was your visit to the Mandir today?",
+                "How welcoming you felt during your visit?",
+                "What touched your heart during your visit?",
+                "We'd love to hear your thoughts.",
+                "How was your experience today?",
+                "What could we do better?",
+                "Any suggestions or comments?",
+                "Share your feedback with us!"
+            ];
+            let currentPlaceholderIndex = 0;
+            let rotationInterval;
+            let typingTimeout;
 
             let currentPage = 0;
             let isSyncing = false; // Flag to prevent concurrent syncs
@@ -227,66 +281,6 @@
                 '2': { type: 'radio', name: 'cleanliness', msgId: 'cleanliness-error-msg' },
                 '3': { type: 'radio', name: 'staff_friendliness', msgId: 'staff_friendliness-error-msg' }
             };
-
-            // Dynamic questions for the comments section
-            const dynamicQuestions = [
-                'How was your visit to BAPS today?',
-                'Did you feel welcomed during your visit?',
-                'How was your experience with our volunteers?',
-                'What touched your heart during your visit?',
-                'Any suggestions to improve your experience?'
-            ];
-            let questionIndex = 0;
-            let typingTimeout;
-            let cycleInterval;
-            let userTyping = false;
-
-            // This function handles the typewriter animation for the comment box
-            function typePlaceholder(text, element) {
-                let charIndex = 0;
-                
-                function type() {
-                    if (userTyping) {
-                        clearInterval(typingTimeout);
-                        return;
-                    }
-                    if (charIndex < text.length) {
-                        element.value += text.charAt(charIndex);
-                        charIndex++;
-                        typingTimeout = setTimeout(type, 50); // Typing speed
-                    }
-                }
-                type();
-            }
-
-            // This function cycles through the questions
-            function startQuestionCycle() {
-                clearInterval(cycleInterval);
-                commentsTextArea.value = ''; // Force clear the value before starting the new animation
-                
-                cycleInterval = setInterval(() => {
-                    if (!userTyping) {
-                        commentsTextArea.value = ''; // Ensure it's cleared before typing the next one
-                        typePlaceholder(dynamicQuestions[questionIndex], commentsTextArea);
-                        questionIndex = (questionIndex + 1) % dynamicQuestions.length;
-                    }
-                }, 6000); // 5 seconds for question display + 1 second buffer
-            }
-
-            // New event listener to clear the textarea on focus and stop animations
-            commentsTextArea.addEventListener('focus', () => {
-                commentsTextArea.value = '';
-                userTyping = true;
-                clearInterval(typingTimeout);
-                clearInterval(cycleInterval);
-            });
-
-            // Keep the input event listener as a secondary safeguard
-            commentsTextArea.addEventListener('input', () => {
-                userTyping = true;
-                clearInterval(typingTimeout);
-                clearInterval(cycleInterval);
-            });
 
             function showPage(pageIndex) {
                 surveyPages.forEach((page, index) => {
@@ -300,15 +294,6 @@
                     nextButton.textContent = 'Submit Survey';
                 } else {
                     nextButton.textContent = 'Next';
-                }
-
-                // Start or stop the placeholder animation based on the current page
-                if (pageIndex === 0) {
-                    userTyping = false;
-                    startQuestionCycle();
-                } else {
-                    clearInterval(typingTimeout);
-                    clearInterval(cycleInterval);
                 }
             }
 
@@ -378,6 +363,8 @@
             function saveSurveyLocally(data) {
                 let pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
                 // Add a unique ID and timestamp to the survey before saving
+                // The UUID is the key identifier for deduplication on the server.
+                // The timestamp is for ordering and is non-critical if the clock is inaccurate.
                 pendingSurveys.push({ id: crypto.randomUUID(), ...data, timestamp: Date.now() });
                 localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSurveys));
                 updateSyncButton();
@@ -396,25 +383,34 @@
             function setButtonsDisabled(disabled) {
                 nextButton.disabled = disabled;
                 backButton.disabled = disabled;
-                syncButton.disabled = disabled;
                 nextButton.classList.toggle('disabled:bg-gray-400', disabled);
             }
 
-            async function syncSurveys() {
+            function toggleSyncingState(isSyncing) {
                 if (isSyncing) {
-                    console.log("Sync already in progress. Skipping.");
+                    syncButton.disabled = true;
+                    syncIcon.classList.add('hidden');
+                    syncSpinner.classList.remove('hidden');
+                } else {
+                    syncButton.disabled = false;
+                    syncIcon.classList.remove('hidden');
+                    syncSpinner.classList.add('hidden');
+                }
+            }
+
+            async function syncSurveys() {
+                if (isSyncing || !navigator.onLine) {
+                    console.log("Sync not possible. Sync in progress or offline.");
                     return;
                 }
                 isSyncing = true;
-                setButtonsDisabled(true);
-                syncLoading.classList.remove('hidden');
+                toggleSyncingState(true);
                 
                 const pendingSurveys = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
                 if (pendingSurveys.length === 0) {
                     showStatus('gray', 'No surveys to sync.');
                     isSyncing = false;
-                    setButtonsDisabled(false);
-                    syncLoading.classList.add('hidden');
+                    toggleSyncingState(false);
                     return;
                 }
 
@@ -455,8 +451,7 @@
                 }
 
                 isSyncing = false;
-                setButtonsDisabled(false);
-                syncLoading.classList.add('hidden');
+                toggleSyncingState(false);
             }
 
             function showStatus(color, message) {
@@ -478,13 +473,61 @@
                 const now = new Date();
                 const currentHour = now.getHours();
 
-                if (lastSyncDate !== today && currentHour >= SYNC_HOUR && pendingSurveys.length > 0) {
+                if (navigator.onLine && lastSyncDate !== today && currentHour >= SYNC_HOUR && pendingSurveys.length > 0) {
                     console.log("It's a new day and it's past the sync time. Auto-syncing...");
                     syncSurveys();
                 } else {
                     console.log("Auto-sync conditions not met. Skipping.");
                 }
             }
+
+            function updateSyncButtonVisibility() {
+                if (navigator.onLine) {
+                    syncContainer.classList.remove('hidden');
+                    updateSyncButton();
+                } else {
+                    syncContainer.classList.add('hidden');
+                }
+            }
+            
+            function typeQuestion(text, callback) {
+                let i = 0;
+                typingTextContainer.textContent = ''; // Clear previous text
+                typingTextContainer.style.display = 'block'; // Show the typing container
+                commentsTextArea.placeholder = ''; // Ensure the textarea placeholder is empty
+                
+                function typeChar() {
+                    if (i < text.length) {
+                        typingTextContainer.textContent += text.charAt(i);
+                        i++;
+                        typingTimeout = setTimeout(typeChar, 50); // Typing speed
+                    } else if (callback) {
+                        callback();
+                    }
+                }
+                typeChar();
+            }
+
+            function rotateQuestions() {
+                clearTimeout(typingTimeout);
+                
+                typeQuestion(placeholderQuestions[currentPlaceholderIndex], () => {
+                    currentPlaceholderIndex = (currentPlaceholderIndex + 1) % placeholderQuestions.length;
+                    rotationInterval = setTimeout(rotateQuestions, 5000); // 5-second display time
+                });
+            }
+
+            // Event listener to hide animation on user interaction
+            commentsTextArea.addEventListener('focus', () => {
+                clearTimeout(rotationInterval);
+                clearTimeout(typingTimeout);
+                typingTextContainer.style.display = 'none';
+            });
+            commentsTextArea.addEventListener('blur', () => {
+                if (!commentsTextArea.value.trim()) {
+                    rotateQuestions(); // Restart if the field is empty
+                }
+            });
 
             // Event listener for the new "Sync Now" button
             syncButton.addEventListener('click', () => {
@@ -529,13 +572,30 @@
                 };
 
                 saveSurveyLocally(data);
+                showThankYouScreen();
+            }
 
-                showStatus('blue', 'Survey saved locally. It will be synced later.');
+            function showThankYouScreen() {
+                // Stop all animations
+                clearTimeout(rotationInterval);
+                clearTimeout(typingTimeout);
 
-                form.reset();
-                currentPage = 0;
-                showPage(currentPage);
-                setButtonsDisabled(false);
+                // Show the thank you screen
+                const surveyContainer = document.getElementById('surveyContainer');
+                surveyContainer.classList.add('hidden');
+                thankYouScreen.classList.remove('hidden');
+
+                // Reset the form and navigate back to the first page after a few seconds
+                setTimeout(() => {
+                    form.reset();
+                    currentPage = 0;
+                    showPage(currentPage);
+                    surveyContainer.classList.remove('hidden');
+                    thankYouScreen.classList.add('hidden');
+                    setButtonsDisabled(false);
+                    // Restart the placeholder animation
+                    rotateQuestions();
+                }, 5000); // Wait for 5 seconds
             }
 
             form.addEventListener('submit', (e) => {
@@ -544,11 +604,19 @@
 
             // Initialize the survey on page load
             showPage(currentPage);
-            updateSyncButton();
+            updateSyncButtonVisibility();
             checkAndAutoSync();
             
             // Periodically check for auto-sync every hour
             setInterval(checkAndAutoSync, 60 * 60 * 1000); 
+
+            // Listen for changes in network status
+            window.addEventListener('online', updateSyncButtonVisibility);
+            window.addEventListener('offline', updateSyncButtonVisibility);
+
+            // Start the initial placeholder rotation
+            rotateQuestions();
+
         })();
     </script>
 </body>
