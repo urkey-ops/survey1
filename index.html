@@ -13,11 +13,16 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        input[type="radio"]:checked + label {
+        
+        /* New: Scoped styles for Emoji and Number Scale questions */
+        .emoji-radio-group input[type="radio"]:checked + label,
+        .number-scale-group input[type="radio"]:checked + label {
             transform: scale(1.1);
             box-shadow: 0 4px 14px rgba(0,0,0,0.1);
             border-color: #3b82f6;
         }
+        
+        /* Star Rating styles are now scoped */
         .star-rating input[type="radio"] {
             display: none;
         }
@@ -35,10 +40,11 @@
         .star-rating input[type="radio"]:checked ~ label.star:hover {
             color: #fcd34d;
         }
+        
+        /* Global styles remain the same */
         #syncButton.hidden, #adminClearButton.hidden {
             display: none;
         }
-        /* Checkmark Animation Styles */
         .checkmark-container {
             display: flex;
             justify-content: center;
@@ -332,7 +338,8 @@
                     `;
                     break;
                 case 'emoji-radio':
-                    html += `<div class="flex justify-around items-center space-x-4">`;
+                    // Added a new class for scoping the CSS
+                    html += `<div class="emoji-radio-group flex justify-around items-center space-x-4">`;
                     questionData.options.forEach(option => {
                         const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
                         html += `
@@ -346,8 +353,9 @@
                     html += `</div>`;
                     break;
                 case 'number-scale':
+                    // Added a new class for scoping the CSS
                     html += `
-                        <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
+                        <div class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4">
                             <span class="text-xs text-gray-500">${questionData.labels.min}</span>
                             <div class="flex space-x-2">
                     `;
