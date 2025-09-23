@@ -16,29 +16,29 @@
         input[type="radio"]:checked + label {
             transform: scale(1.1);
             box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-            border-color: #3b82f6; /* Tailwind's blue-500 */
+            border-color: #3b82f6;
         }
         .star-rating input[type="radio"] {
             display: none;
         }
         .star-rating label.star {
             cursor: pointer;
-            color: #d1d5db; /* Tailwind's gray-400 */
+            color: #d1d5db;
             transition: color 0.2s ease, transform 0.2s ease;
         }
         .star-rating input[type="radio"]:checked ~ label.star,
         .star-rating:hover input[type="radio"]:checked ~ label.star {
-            color: #f59e0b; /* Tailwind's amber-500 */
+            color: #f59e0b;
         }
         .star-rating label.star:hover,
         .star-rating label.star:hover ~ label.star,
         .star-rating input[type="radio"]:checked ~ label.star:hover {
-            color: #fcd34d; /* Tailwind's amber-300 */
+            color: #fcd34d;
         }
         #syncButton.hidden, #adminClearButton.hidden {
             display: none;
         }
-        /* Custom checkmark styles and animation */
+        /* Checkmark Animation Styles */
         .checkmark-container {
             display: flex;
             justify-content: center;
@@ -79,7 +79,6 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
-        /* New loading animation for sync button */
         .sync-loading {
             animation: pulse 1.5s infinite;
         }
@@ -101,95 +100,12 @@
         <div id="statusMessage" class="hidden text-sm"></div>
         <div id="surveyContent">
             <form id="surveyForm" class="space-y-6">
-                <div class="survey-page" data-page="0">
-                    <div id="rotatingQuestion" class="block text-gray-700 font-semibold mb-2" aria-live="polite"></div>
-                    <textarea
-                        id="comments"
-                        name="comments"
-                        rows="4"
-                        class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
-                        placeholder="Type your comments here..."
-                        required
-                    ></textarea>
-                </div>
-                <div class="survey-page hidden" data-page="1">
-                    <label class="block text-gray-700 font-semibold mb-2">2. Overall, how satisfied were you with your visit today?</label>
-                    <div class="flex justify-around items-center space-x-4">
-                        <input type="radio" id="emojiSad" name="satisfaction" value="Sad" class="hidden">
-                        <label for="emojiSad" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                            <span class="text-4xl sm:text-5xl">😞</span>
-                            <span class="mt-2 text-gray-500 text-xs sm:text-sm">Sad</span>
-                        </label>
-                        <input type="radio" id="emojiNeutral" name="satisfaction" value="Neutral" class="hidden">
-                        <label for="emojiNeutral" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                            <span class="text-4xl sm:text-5xl">😐</span>
-                            <span class="mt-2 text-gray-500 text-xs sm:text-sm">Neutral</span>
-                        </label>
-                        <input type="radio" id="emojiHappy" name="satisfaction" value="Happy" class="hidden">
-                        <label for="emojiHappy" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                            <span class="text-4xl sm:text-5xl">😊</span>
-                            <span class="mt-2 text-gray-500 text-xs sm:text-sm">Happy</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="survey-page hidden" data-page="2">
-                    <label class="block text-gray-700 font-semibold mb-2">3. How would you rate the cleanliness of the facility?</label>
-                    <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
-                        <span class="text-xs text-gray-500">1 (Poor)</span>
-                        <div class="flex space-x-2">
-                            <input type="radio" id="clean1" name="cleanliness" value="1" class="hidden">
-                            <label for="clean1" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">1</label>
-                            <input type="radio" id="clean2" name="cleanliness" value="2" class="hidden">
-                            <label for="clean2" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">2</label>
-                            <input type="radio" id="clean3" name="cleanliness" value="3" class="hidden">
-                            <label for="clean3" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">3</label>
-                            <input type="radio" id="clean4" name="cleanliness" value="4" class="hidden">
-                            <label for="clean4" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
-                            <input type="radio" id="clean5" name="cleanliness" value="5" class="hidden">
-                            <label for="clean5" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
-                        </div>
-                        <span class="text-xs text-gray-500">5 (Excellent)</span>
-                    </div>
-                </div>
-                <div class="survey-page hidden" data-page="3">
-                    <label class="block text-gray-700 font-semibold mb-2">4. How friendly was the volunteer staff?</label>
-                    <div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">
-                        <input type="radio" id="star5" name="staff_friendliness" value="5">
-                        <label for="star5" class="star">
-                            <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                        </label>
-                        <input type="radio" id="star4" name="staff_friendliness" value="4">
-                        <label for="star4" class="star">
-                            <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                        </label>
-                        <input type="radio" id="star3" name="staff_friendliness" value="3">
-                        <label for="star3" class="star">
-                            <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                        </label>
-                        <input type="radio" id="star2" name="staff_friendliness" value="2">
-                        <label for="star2" class="star">
-                            <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                        </label>
-                        <input type="radio" id="star1" name="staff_friendliness" value="1">
-                        <label for="star1" class="star">
-                            <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                        </label>
-                    </div>
-                </div>
+                <div id="questionContainer"></div>
                 <div id="survey-navigation" class="flex justify-between items-center mt-6">
-                    <button
-                        id="backButton"
-                        type="button"
-                        class="px-6 py-3 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors"
-                        style="visibility: hidden;"
-                    >
+                    <button id="backButton" type="button" class="px-6 py-3 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors" style="visibility: hidden;">
                         Back
                     </button>
-                    <button
-                        id="nextButton"
-                        type="button"
-                        class="px-6 py-3 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors"
-                    >
+                    <button id="nextButton" type="button" class="px-6 py-3 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors">
                         Next
                     </button>
                 </div>
@@ -203,29 +119,68 @@
         const syncButton = document.getElementById('syncButton');
         const adminClearButton = document.getElementById('adminClearButton');
         const mainTitle = document.getElementById('mainTitle');
-        const surveyPages = document.querySelectorAll('.survey-page');
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
-        const rotatingQuestionEl = document.getElementById('rotatingQuestion');
-        const commentsTextarea = document.getElementById('comments');
+        const questionContainer = document.getElementById('questionContainer');
         const surveyContent = document.getElementById('surveyContent');
 
-        const DEBUG_MODE = true; // Set to false for production
+        const DEBUG_MODE = true;
         function log(message, ...args) {
             if (DEBUG_MODE) {
                 console.log(`[DEBUG] ${message}`, ...args);
             }
         }
 
-        const questions = [
-            "1. What did you like about your visit today?",
-            "1. What could we do better during your next visit?",
-            "1. Do you have any general comments or suggestions?",
-            "1. What was the most memorable part of your experience?"
+        const surveyQuestions = [
+            {
+                id: 'comments',
+                name: 'comments',
+                type: 'textarea',
+                question: '1. What did you like about your visit today?',
+                placeholder: 'Type your comments here...',
+                required: true,
+                rotatingText: [
+                    "1. What did you like about your visit today?",
+                    "1. What could we do better during your next visit?",
+                    "1. Do you have any general comments or suggestions?",
+                    "1. What was the most memorable part of your experience?"
+                ]
+            },
+            {
+                id: 'satisfaction',
+                name: 'satisfaction',
+                type: 'emoji-radio',
+                question: '2. Overall, how satisfied were you with your visit today?',
+                options: [
+                    { value: 'Sad', label: 'Sad', emoji: '😞' },
+                    { value: 'Neutral', label: 'Neutral', emoji: '😐' },
+                    { value: 'Happy', label: 'Happy', emoji: '😊' }
+                ]
+            },
+            {
+                id: 'cleanliness',
+                name: 'cleanliness',
+                type: 'number-scale',
+                question: '3. How would you rate the cleanliness of the facility?',
+                min: 1,
+                max: 5,
+                labels: {
+                    min: '1 (Poor)',
+                    max: '5 (Excellent)'
+                }
+            },
+            {
+                id: 'staff_friendliness',
+                name: 'staff_friendliness',
+                type: 'star-rating',
+                question: '4. How friendly was the volunteer staff?',
+                min: 1,
+                max: 5
+            }
         ];
 
         let currentPage = 0;
-        let questionIndex = 0;
+        let questionRotationIndex = 0;
         let typingTimeout;
         let displayTimeout;
         let adminClickCount = 0;
@@ -239,9 +194,9 @@
             rotationDisplayTime: 4000,
             resetTime: 5000,
             adminClicksRequired: 5,
-            adminClickTimeout: 3000, // ms
-            inactivityTime: 30000, // 30 seconds
-            debounceDelay: 200, // ms
+            adminClickTimeout: 3000,
+            inactivityTime: 30000,
+            debounceDelay: 200,
         };
 
         // Helper function to generate a UUID
@@ -254,11 +209,7 @@
 
         // --- Question Rotation & User Interaction Logic ---
         function startQuestionRotation() {
-            if (typingTimeout || displayTimeout) {
-                log("Rotation already active. Skipping start.");
-                return;
-            }
-            isUserActive = false;
+            if (currentPage !== 0 || isUserActive) return;
             log("Starting question rotation.");
             rotateQuestions();
         }
@@ -271,10 +222,10 @@
             displayTimeout = null;
         }
 
-        // Debounced function to handle user activity
         function handleUserActivity() {
-            log("User activity detected. Setting flag and clearing inactivity timer.");
+            log("User activity detected. Pausing rotation.");
             isUserActive = true;
+            stopQuestionRotation();
             clearTimeout(inactivityTimeout);
             inactivityTimeout = setTimeout(() => {
                 log("User inactive. Resetting flag and starting rotation.");
@@ -284,85 +235,128 @@
         }
 
         function typeWriter(text, i) {
+            const questionElement = questionContainer.querySelector('#rotatingQuestion');
             if (i < text.length) {
-                rotatingQuestionEl.textContent += text.charAt(i);
+                questionElement.textContent += text.charAt(i);
                 typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
             } else {
-                log("Question finished typing. Checking user activity.");
-                // Only schedule the next rotation if the user is not active
                 if (!isUserActive) {
                     displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
-                } else {
-                    log("User is active. Question rotation paused.");
                 }
             }
         }
 
         function rotateQuestions() {
-            log("Rotating to the next question.");
+            const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
+            if (!rotatingQuestionEl) return;
             stopQuestionRotation();
             if (isUserActive) {
                 log("User is still active. Not starting new question yet.");
                 return;
             }
-            const currentQuestion = questions[questionIndex];
+            const questionData = surveyQuestions[0];
+            const currentQuestion = questionData.rotatingText[questionRotationIndex];
             rotatingQuestionEl.textContent = "";
-            questionIndex = (questionIndex + 1) % questions.length;
+            questionRotationIndex = (questionRotationIndex + 1) % questionData.rotatingText.length;
             typeWriter(currentQuestion, 0);
         }
 
-        // Debounce wrapper
-        function debounce(func, delay) {
+        const debouncedUserActivity = (func, delay) => {
             return function(...args) {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => func.apply(this, args), delay);
             };
-        }
-
-        const debouncedUserActivity = debounce(handleUserActivity, config.debounceDelay);
-
-        // Event listeners for user interaction to pause rotation
-        document.addEventListener('mousemove', debouncedUserActivity);
-        document.addEventListener('mousedown', debouncedUserActivity);
-        document.addEventListener('keydown', debouncedUserActivity);
-        document.addEventListener('touchstart', debouncedUserActivity);
-        document.addEventListener('touchend', debouncedUserActivity); // Added touchend for robustness
+        };
+        const debouncedHandleActivity = debouncedUserActivity(handleUserActivity, config.debounceDelay);
 
         // --- Survey Page & Validation Logic ---
+        function renderPage(pageIndex) {
+            const questionData = surveyQuestions[pageIndex];
+            if (!questionData) return;
 
-        function showPage(pageIndex) {
-            surveyPages.forEach((page, index) => {
-                page.classList.toggle('hidden', index !== pageIndex);
-                // Set focus to the first interactive element for accessibility
-                if (index === pageIndex) {
-                    const firstInput = page.querySelector('textarea, input:not([type="hidden"])');
-                    if (firstInput) {
-                        firstInput.focus();
-                        log(`Focusing on element: ${firstInput.id || firstInput.name}`);
+            let html = `<label class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
+
+            switch (questionData.type) {
+                case 'textarea':
+                    html = `
+                        <label id="rotatingQuestion" class="block text-gray-700 font-semibold mb-2" aria-live="polite"></label>
+                        <textarea
+                            id="${questionData.id}"
+                            name="${questionData.name}"
+                            rows="4"
+                            class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                            placeholder="${questionData.placeholder}"
+                            required
+                        ></textarea>
+                    `;
+                    break;
+                case 'emoji-radio':
+                    html += `<div class="flex justify-around items-center space-x-4">`;
+                    questionData.options.forEach(option => {
+                        html += `
+                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="hidden">
+                            <label for="${questionData.id + option.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
+                                <span class="text-4xl sm:text-5xl">${option.emoji}</span>
+                                <span class="mt-2 text-gray-500 text-xs sm:text-sm">${option.label}</span>
+                            </label>
+                        `;
+                    });
+                    html += `</div>`;
+                    break;
+                case 'number-scale':
+                    html += `
+                        <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
+                            <span class="text-xs text-gray-500">${questionData.labels.min}</span>
+                            <div class="flex space-x-2">
+                    `;
+                    for (let i = questionData.min; i <= questionData.max; i++) {
+                        html += `
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="hidden">
+                            <label for="${questionData.id + i}" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">${i}</label>
+                        `;
                     }
-                }
-            });
-            backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
+                    html += `
+                            </div>
+                            <span class="text-xs text-gray-500">${questionData.labels.max}</span>
+                        </div>
+                    `;
+                    break;
+                case 'star-rating':
+                    html += `<div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">`;
+                    for (let i = questionData.max; i >= questionData.min; i--) {
+                        html += `
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}">
+                            <label for="${questionData.id + i}" class="star">
+                                <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
+                            </label>
+                        `;
+                    }
+                    html += `</div>`;
+                    break;
+            }
+            questionContainer.innerHTML = html;
             
-            if (pageIndex === surveyPages.length - 1) {
-                nextButton.textContent = 'Submit Survey';
-                nextButton.type = 'submit';
+            backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
+            nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
+
+            if (pageIndex === 0) {
+                startQuestionRotation();
             } else {
-                nextButton.textContent = 'Next';
-                nextButton.type = 'button';
+                stopQuestionRotation();
             }
         }
 
-        function validatePage(pageElement) {
-            const textarea = pageElement.querySelector('textarea');
-            if (textarea) {
-                return textarea.value.trim() !== '';
+        function validateCurrentPage() {
+            const questionData = surveyQuestions[currentPage];
+            let isValid = false;
+            if (questionData.type === 'textarea') {
+                const textarea = document.getElementById(questionData.id);
+                isValid = textarea && textarea.value.trim() !== '';
+            } else {
+                const radioButtons = document.getElementsByName(questionData.name);
+                isValid = Array.from(radioButtons).some(radio => radio.checked);
             }
-            const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
-            if (radioButtons.length > 0) {
-                return Array.from(radioButtons).some(radio => radio.checked);
-            }
-            return true;
+            return isValid;
         }
 
         function showTemporaryMessage(message, type = 'info') {
@@ -374,9 +368,8 @@
                 statusMessage.style.display = 'none';
             }, 5000);
         }
-        
-        // --- Offline-first and Sync Logic ---
 
+        // --- Offline-first and Sync Logic ---
         function getSurveyQueue() {
             try {
                 const queue = JSON.parse(localStorage.getItem('surveyQueue'));
@@ -402,7 +395,6 @@
                 updateSyncButtonVisibility();
                 return;
             }
-
             log(`Starting sync process for ${queue.length} items.`);
             syncButton.textContent = 'Syncing...';
             syncButton.classList.add('sync-loading');
@@ -419,7 +411,6 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(surveyData)
                     });
-
                     if (response.ok) {
                         successfullySyncedCount++;
                         log(`Successfully synced item: ${surveyData.id}`);
@@ -437,9 +428,7 @@
                 }
             }
             
-            log("Sync process finished. Updating local queue.");
             localStorage.setItem('surveyQueue', JSON.stringify(queue));
-            
             syncButton.classList.remove('sync-loading');
             updateSyncButtonVisibility(failedToSync);
 
@@ -482,7 +471,7 @@
 
         function scheduleDailySync() {
             const now = new Date();
-            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0); // 7:00 PM
+            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0);
             if (now > syncTime) {
                 syncTime.setDate(syncTime.getDate() + 1);
             }
@@ -491,67 +480,42 @@
             setTimeout(syncData, delay);
         }
 
-        // --- Event Listeners ---
-        
+        // --- Event Listeners & Initialization ---
         nextButton.addEventListener('click', () => {
-            const currentPageElement = surveyPages[currentPage];
-            const isPageValid = validatePage(currentPageElement);
-            log(`Next button clicked. Validating page ${currentPage}. Is valid: ${isPageValid}`);
-
-            if (isPageValid) {
-                currentPageElement.querySelectorAll('textarea, input[type="radio"], label').forEach(el => {
-                    el.classList.remove('border-red-500');
-                    if (el.nextElementSibling) el.nextElementSibling.classList.remove('border-red-500');
-                });
-                statusMessage.style.display = 'none';
-                
-                if (currentPage < surveyPages.length - 1) {
-                    currentPage++;
-                    showPage(currentPage);
-                } else {
-                    form.dispatchEvent(new Event('submit', { cancelable: true }));
-                }
+            if (!validateCurrentPage()) {
+                showTemporaryMessage('Please answer the current question to continue.', 'error');
+                return;
+            }
+            
+            currentPage++;
+            if (currentPage < surveyQuestions.length) {
+                renderPage(currentPage);
             } else {
-                log("Validation failed. Showing error message.");
-                statusMessage.textContent = 'Please answer the current question to continue.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                statusMessage.style.display = 'block';
-
-                currentPageElement.querySelectorAll('textarea, input[type="radio"], label').forEach(el => {
-                    if (el.tagName === 'LABEL' && el.previousElementSibling.type === 'radio') {
-                        el.classList.add('border-red-500');
-                    } else if (el.tagName === 'TEXTAREA') {
-                        el.classList.add('border-red-500');
-                    }
-                });
+                // All questions answered, dispatch submit event
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
             }
         });
         
         backButton.addEventListener('click', () => {
             if (currentPage > 0) {
-                log("Back button clicked. Returning to previous page.");
                 currentPage--;
-                showPage(currentPage);
+                renderPage(currentPage);
                 statusMessage.style.display = 'none';
             }
         });
 
         syncButton.addEventListener('click', syncData);
 
-        // Secure Admin Access Logic
         mainTitle.addEventListener('click', () => {
             adminClickCount++;
-            log(`Admin click count: ${adminClickCount}`);
             if (adminClickCount === 1) {
                 adminTimer = setTimeout(() => {
                     adminClickCount = 0;
-                    log("Admin timer reset.");
                 }, config.adminClickTimeout);
             } else if (adminClickCount >= config.adminClicksRequired) {
                 clearTimeout(adminTimer);
                 adminClickCount = 0;
                 adminClearButton.classList.toggle('hidden');
-                log("Admin button toggled.");
                 showTemporaryMessage('Admin button toggled.');
             }
         });
@@ -560,18 +524,14 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             const formData = new FormData(form);
-            const data = {
-                id: uuidv4(),
-                question: rotatingQuestionEl.textContent,
-                comments: formData.get('comments'),
-                satisfaction: formData.get('satisfaction'),
-                cleanliness: formData.get('cleanliness'),
-                staff_friendiness: formData.get('staff_friendliness')
-            };
+            const data = {};
+            formData.forEach((value, key) => {
+                data[key] = value;
+            });
+            data.id = uuidv4();
+            data.question_text = surveyQuestions.map(q => q.question);
 
-            log("Form submitted. Saving to queue.", data);
             saveSurveyToQueue(data);
             
             surveyContent.style.display = 'none';
@@ -586,34 +546,26 @@
                 </div>
             `;
             
-            stopQuestionRotation();
-
             setTimeout(() => {
-                log("Survey reset initiated.");
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
                 form.reset();
                 currentPage = 0;
-                showPage(currentPage);
-                startQuestionRotation(); // Restart rotation after reset
+                renderPage(currentPage);
             }, config.resetTime);
         });
 
-        // Network status listeners
-        window.addEventListener('online', () => {
-            log("Browser is online. Attempting to sync.");
-            syncData();
-            updateSyncButtonVisibility();
-        });
+        document.addEventListener('mousemove', debouncedHandleActivity);
+        document.addEventListener('mousedown', debouncedHandleActivity);
+        document.addEventListener('keydown', debouncedHandleActivity);
+        document.addEventListener('touchstart', debouncedHandleActivity);
+        document.addEventListener('touchend', debouncedHandleActivity);
 
-        window.addEventListener('offline', () => {
-            log("Browser is offline. Sync button visibility updated.");
-            updateSyncButtonVisibility();
-        });
+        window.addEventListener('online', syncData);
+        window.addEventListener('offline', updateSyncButtonVisibility);
 
         // Initial setup
-        showPage(currentPage);
-        startQuestionRotation();
+        renderPage(currentPage);
         updateSyncButtonVisibility();
         scheduleDailySync();
     </script>
