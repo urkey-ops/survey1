@@ -172,6 +172,9 @@
                 page.classList.toggle('hidden', index !== pageIndex);
             });
 
+            // Hide status message on page change
+            statusMessage.style.display = 'none';
+
             backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
             if (pageIndex === surveyPages.length - 1) {
                 nextButton.textContent = 'Submit Survey';
@@ -196,10 +199,9 @@
             }
             return true;
         }
-        
+
         // --- Offline-first and Sync Logic ---
 
-        // Get the queue from localStorage or initialize it as an empty array
         function getSurveyQueue() {
             try {
                 const queue = JSON.parse(localStorage.getItem('surveyQueue'));
@@ -294,17 +296,14 @@
         // --- Event Listeners and Initial State ---
         
         nextButton.addEventListener('click', () => {
-            if (currentPage < surveyPages.length - 1) {
-                const currentPageElement = surveyPages[currentPage];
-                if (validatePage(currentPageElement)) {
-                    statusMessage.style.display = 'none';
-                    currentPage++;
-                    showPage(currentPage);
-                } else {
-                    statusMessage.textContent = 'Please answer the current question to continue.';
-                    statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                    statusMessage.style.display = 'block';
-                }
+            const currentPageElement = surveyPages[currentPage];
+            if (validatePage(currentPageElement)) {
+                currentPage++;
+                showPage(currentPage);
+            } else {
+                statusMessage.textContent = 'Please answer the current question to continue.';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+                statusMessage.style.display = 'block';
             }
         });
         
@@ -343,7 +342,6 @@
 
             saveSurveyToQueue(data);
             
-            // Immediately attempt to sync if online
             if (navigator.onLine) {
                 await syncData();
             } else {
@@ -372,6 +370,29 @@
             console.log("Device is offline. Sync paused.");
             updateSyncButtonVisibility();
         });
+
+        let typingTimeout;
+        let displayTimeout;
+
+        function typeWriter(text, i, speed) {
+            if (i < text.length) {
+                rotatingQuestionEl.textContent += text.charAt(i);
+                typingTimeout = setTimeout(() => typeWriter(text, i + 1, speed), speed);
+            } else {
+                displayTimeout = setTimeout(rotateQuestions, 4000);
+            }
+        }
+
+        function rotateQuestions() {
+            clearTimeout(typingTimeout);
+            clearTimeout(displayTimeout);
+
+            const currentQuestion = questions[questionIndex];
+            rotatingQuestionEl.textContent = "";
+            questionIndex = (questionIndex + 1) % questions.length;
+            
+            typeWriter(currentQuestion, 0, 50);
+        }
 
         // Initial setup
         showPage(currentPage);
