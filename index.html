@@ -208,7 +208,9 @@
             isUserActive: false,
             debounceTimer: null,
             adminClickCount: 0,
-            adminTimer: null
+            adminTimer: null,
+            isTyping: false,
+            stopRotationAfterTyping: false,
         };
 
         // --- Helper Functions ---
@@ -248,6 +250,7 @@
 
         const stopQuestionRotation = () => {
             log("Stopping question rotation.");
+            appState.isTyping = false;
             clearTimeout(appState.typingTimeout);
             clearTimeout(appState.displayTimeout);
             appState.typingTimeout = null;
@@ -255,23 +258,38 @@
         };
 
         const handleUserActivity = () => {
-            log("User activity detected. Pausing rotation.");
-            appState.isUserActive = true;
-            stopQuestionRotation();
+            log("User activity detected.");
             clearTimeout(appState.inactivityTimeout);
+            appState.isUserActive = true;
+
+            if (appState.isTyping) {
+                log("Typing in progress. Will stop rotation after current sentence.");
+                appState.stopRotationAfterTyping = true;
+            } else {
+                stopQuestionRotation();
+            }
+
             appState.inactivityTimeout = setTimeout(() => {
                 log("User inactive. Resetting flag and starting rotation.");
                 appState.isUserActive = false;
+                appState.stopRotationAfterTyping = false;
                 startQuestionRotation();
             }, config.inactivityTime);
         };
 
         const typeWriter = (text, i) => {
             const questionElement = questionContainer.querySelector('#rotatingQuestion');
-            if (i < text.length) {
+            if (!questionElement) return;
+
+            if (i < text.length && !appState.stopRotationAfterTyping) {
+                appState.isTyping = true;
                 questionElement.textContent += text.charAt(i);
                 appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
             } else {
+                questionElement.textContent = text;
+                appState.isTyping = false;
+                appState.stopRotationAfterTyping = false;
+
                 if (!appState.isUserActive) {
                     appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
                 }
@@ -280,17 +298,16 @@
 
         const rotateQuestions = () => {
             const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
-            if (!rotatingQuestionEl) return;
+            if (!rotatingQuestionEl || appState.isUserActive) return;
             stopQuestionRotation();
-            if (appState.isUserActive) {
-                return;
-            }
+            
             const questionData = surveyQuestions[0];
             const currentQuestion = questionData.rotatingText[appState.questionRotationIndex];
             rotatingQuestionEl.textContent = "";
             appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
             typeWriter(currentQuestion, 0);
         };
+        
         const debouncedHandleActivity = debounce(handleUserActivity, config.debounceDelay);
 
         // --- Survey Page Logic ---
@@ -578,14 +595,18 @@
                 </div>
             `;
             
+            const rotatingQuestion = surveyQuestions[0].rotatingText[appState.questionRotationIndex];
+            const resetDelay = appState.isTyping ? (config.rotationSpeed * rotatingQuestion.length) + 1000 : config.resetTime;
+
             setTimeout(() => {
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
                 form.reset();
                 appState.currentPage = 0;
                 appState.formData = {};
+                appState.isUserActive = false;
                 renderPage(appState.currentPage);
-            }, config.resetTime);
+            }, resetDelay);
         });
 
         form.addEventListener('change', (e) => {
@@ -605,6 +626,11 @@
         document.addEventListener('keydown', debouncedHandleActivity);
         document.addEventListener('touchstart', debouncedHandleActivity);
         document.addEventListener('touchend', debouncedHandleActivity);
+        document.addEventListener('focusin', (e) => {
+            if (e.target.id === 'comments') {
+                debouncedHandleActivity();
+            }
+        });
 
         window.addEventListener('online', syncData);
         window.addEventListener('offline', updateSyncButtonVisibility);
