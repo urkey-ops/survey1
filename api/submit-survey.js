@@ -69,9 +69,9 @@ function rotateQuestions() {
     typeWriter(currentQuestion, 0, 50);
 }
 
-// Event listener for the "Next" button click
+// Event listener for the "Next" button. It handles navigation only.
 nextButton.addEventListener('click', () => {
-    // Only perform navigation if we are NOT on the last page
+    // Navigate only if not on the final page.
     if (currentPage < surveyPages.length - 1) {
         const currentPageElement = surveyPages[currentPage];
         if (validatePage(currentPageElement)) {
@@ -84,11 +84,9 @@ nextButton.addEventListener('click', () => {
             statusMessage.style.display = 'block';
         }
     }
-    // No 'else' block here. The button's type="submit" will trigger the form submit handler
-    // on the last page automatically.
 });
 
-// Event listener for the "Back" button
+// Event listener for the "Back" button.
 backButton.addEventListener('click', () => {
     if (currentPage > 0) {
         currentPage--;
@@ -96,11 +94,11 @@ backButton.addEventListener('click', () => {
     }
 });
 
-// Event listener for the entire form's submission
+// Event listener for the form submission. This runs ONLY when the nextButton's type is "submit".
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Perform validation on the last page before submission
+    // Re-validate the final page to be safe.
     const currentPageElement = surveyPages[currentPage];
     if (!validatePage(currentPageElement)) {
         statusMessage.textContent = 'Please answer the current question to continue.';
@@ -109,13 +107,11 @@ form.addEventListener('submit', async (e) => {
         return;
     }
 
-    // Prepare UI for submission
     statusMessage.style.display = 'none';
     statusMessage.textContent = 'Submitting survey...';
     statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
     statusMessage.style.display = 'block';
 
-    // Collect all form data
     const formData = new FormData(form);
     const data = {
         question: rotatingQuestionEl.textContent,
@@ -125,7 +121,6 @@ form.addEventListener('submit', async (e) => {
         staff_friendliness: formData.get('staff_friendliness')
     };
 
-    // Send the data
     try {
         const response = await fetch('/api/submit-survey', {
             method: 'POST',
