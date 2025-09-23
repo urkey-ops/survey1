@@ -35,7 +35,7 @@
         .star-rating input[type="radio"]:checked ~ label.star:hover {
             color: #fcd34d; /* Tailwind's amber-300 */
         }
-        #syncButton.hidden {
+        #syncButton.hidden, #adminClearButton.hidden {
             display: none;
         }
         /* Custom checkmark styles and animation */
@@ -79,6 +79,10 @@
             50% { transform: scale(1.05); }
             100% { transform: scale(1); }
         }
+        /* New loading animation for sync button */
+        .sync-loading {
+            animation: pulse 1.5s infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -89,6 +93,9 @@
         
         <button id="syncButton" class="hidden absolute top-4 right-4 text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg shadow-md px-4 py-2 transition-colors duration-200">
             Sync Data
+        </button>
+        <button id="adminClearButton" class="hidden absolute top-4 left-4 text-white text-xs font-semibold bg-red-500 hover:bg-red-600 rounded-lg shadow-md px-2 py-1 transition-colors duration-200">
+            Clear Queue
         </button>
 
         <div id="statusMessage" class="hidden text-sm"></div>
@@ -194,10 +201,12 @@
         const form = document.getElementById('surveyForm');
         const statusMessage = document.getElementById('statusMessage');
         const syncButton = document.getElementById('syncButton');
+        const adminClearButton = document.getElementById('adminClearButton');
         const surveyPages = document.querySelectorAll('.survey-page');
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
         const rotatingQuestionEl = document.getElementById('rotatingQuestion');
+        const commentsTextarea = document.getElementById('comments');
         const surveyContent = document.getElementById('surveyContent');
 
         const questions = [
@@ -209,6 +218,16 @@
 
         let currentPage = 0;
         let questionIndex = 0;
+        let typingTimeout;
+        let displayTimeout;
+        let lastTap = 0;
+
+        // Configuration object for easy maintenance
+        const config = {
+            rotationSpeed: 50, // ms per character
+            rotationDisplayTime: 4000, // ms to display a full question
+            resetTime: 5000 // ms to display the thank you screen
+        };
 
         function showPage(pageIndex) {
             surveyPages.forEach((page, index) => {
@@ -226,19 +245,16 @@
 
         function validatePage(pageElement) {
             const textarea = pageElement.querySelector('textarea');
-            if (textarea && textarea.required && !textarea.value.trim()) {
-                return false;
+            if (textarea) {
+                return textarea.value.trim() !== '';
             }
             const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
             if (radioButtons.length > 0) {
-                const isChecked = Array.from(radioButtons).some(radio => radio.checked);
-                if (!isChecked) {
-                    return false;
-                }
+                return Array.from(radioButtons).some(radio => radio.checked);
             }
             return true;
         }
-
+        
         // --- Offline-first and Sync Logic ---
 
         function getSurveyQueue() {
@@ -264,11 +280,11 @@
                 updateSyncButtonVisibility();
                 return;
             }
-            
-            statusMessage.textContent = `Syncing ${queue.length} survey(s)...`;
-            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
-            statusMessage.style.display = 'block';
 
+            // Show syncing feedback
+            syncButton.textContent = 'Syncing...';
+            syncButton.classList.add('sync-loading');
+            
             let successfullySyncedCount = 0;
             const failedSubmissions = [];
 
@@ -291,24 +307,12 @@
                     failedSubmissions.push(surveyData);
                 }
             }
-
-            localStorage.setItem('surveyQueue', JSON.stringify(failedSubmissions));
-            updateSyncButtonVisibility();
-
-            if (successfullySyncedCount === queue.length) {
-                statusMessage.textContent = 'All surveys synced successfully!';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
-            } else if (successfullySyncedCount > 0) {
-                statusMessage.textContent = `Synced ${successfullySyncedCount} of ${queue.length} surveys. The rest will be retried later.`;
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
-            } else {
-                statusMessage.textContent = 'Sync failed. Please check internet connection.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-            }
             
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 5000);
+            localStorage.setItem('surveyQueue', JSON.stringify(failedSubmissions));
+            
+            // Hide syncing feedback and update button
+            syncButton.classList.remove('sync-loading');
+            updateSyncButtonVisibility();
         }
 
         function updateSyncButtonVisibility() {
@@ -320,29 +324,82 @@
                 syncButton.classList.add('hidden');
             }
         }
-
-        function scheduleDailySync() {
-            const now = new Date();
-            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0); // 7:00 PM
-            if (now > syncTime) {
-                syncTime.setDate(syncTime.getDate() + 1);
+        
+        function clearQueue() {
+            if (confirm("Are you sure you want to clear all unsynced data? This action cannot be undone.")) {
+                localStorage.removeItem('surveyQueue');
+                updateSyncButtonVisibility();
+                statusMessage.textContent = 'Unsynced data cleared.';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-gray-100 text-gray-700 font-medium';
+                statusMessage.style.display = 'block';
+                setTimeout(() => statusMessage.style.display = 'none', 3000);
             }
-            const delay = syncTime.getTime() - now.getTime();
-            setTimeout(syncData, delay);
-            console.log(`Scheduled next sync for ${syncTime.toLocaleString()}.`);
         }
 
-        // --- Event Listeners and Initial State ---
+        // --- Question Rotation Logic ---
+
+        function typeWriter(text, i) {
+            if (i < text.length) {
+                rotatingQuestionEl.textContent += text.charAt(i);
+                typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
+            } else {
+                displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
+            }
+        }
+
+        function rotateQuestions() {
+            clearTimeout(typingTimeout);
+            clearTimeout(displayTimeout);
+            const currentQuestion = questions[questionIndex];
+            rotatingQuestionEl.textContent = "";
+            questionIndex = (questionIndex + 1) % questions.length;
+            typeWriter(currentQuestion, 0);
+        }
+
+        // Pause rotation when user interacts with the textarea
+        commentsTextarea.addEventListener('focus', () => {
+            clearTimeout(typingTimeout);
+            clearTimeout(displayTimeout);
+        });
+
+        // Resume rotation if the user leaves the textarea and it's empty
+        commentsTextarea.addEventListener('blur', () => {
+            if (commentsTextarea.value.trim() === '') {
+                displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
+            }
+        });
+
+        // --- Event Listeners ---
         
         nextButton.addEventListener('click', () => {
             const currentPageElement = surveyPages[currentPage];
-            if (validatePage(currentPageElement)) {
-                currentPage++;
-                showPage(currentPage);
+            const isPageValid = validatePage(currentPageElement);
+
+            if (isPageValid) {
+                // Clear any validation styling and message
+                currentPageElement.querySelectorAll('textarea, input[type="radio"]').forEach(el => {
+                    el.classList.remove('border-red-500');
+                    if (el.nextElementSibling) el.nextElementSibling.classList.remove('border-red-500');
+                });
+                statusMessage.style.display = 'none';
+
+                if (currentPage < surveyPages.length - 1) {
+                    currentPage++;
+                    showPage(currentPage);
+                } else {
+                    form.dispatchEvent(new Event('submit', { cancelable: true }));
+                }
             } else {
+                // Show validation message and style invalid fields
                 statusMessage.textContent = 'Please answer the current question to continue.';
                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
                 statusMessage.style.display = 'block';
+
+                currentPageElement.querySelectorAll('textarea, input[type="radio"]').forEach(el => {
+                    el.classList.add('border-red-500');
+                    // Add red border to the label for radio buttons
+                    if (el.nextElementSibling) el.nextElementSibling.classList.add('border-red-500');
+                });
             }
         });
         
@@ -350,22 +407,24 @@
             if (currentPage > 0) {
                 currentPage--;
                 showPage(currentPage);
-                statusMessage.style.display = 'none'; // Hide validation message on back
+                statusMessage.style.display = 'none';
             }
         });
 
         syncButton.addEventListener('click', syncData);
 
+        // Admin button double-tap logic
+        adminClearButton.addEventListener('touchend', (e) => {
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - lastTap;
+            if (timeDiff < 500 && timeDiff > 0) { // Double tap within 500ms
+                clearQueue();
+            }
+            lastTap = currentTime;
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-
-            const currentPageElement = surveyPages[currentPage];
-            if (!validatePage(currentPageElement)) {
-                statusMessage.textContent = 'Please answer the current question to continue.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                statusMessage.style.display = 'block';
-                return;
-            }
             
             const formData = new FormData(form);
             const data = {
@@ -378,7 +437,6 @@
 
             saveSurveyToQueue(data);
             
-            // Show the Thank You screen
             surveyContent.style.display = 'none';
             statusMessage.style.display = 'block';
             statusMessage.innerHTML = `
@@ -391,62 +449,35 @@
                 </div>
             `;
             
-            // Immediately attempt to sync if online, but don't hold up the thank you screen
             if (navigator.onLine) {
                 syncData();
             }
             
-            // Reset the survey after a brief pause
             setTimeout(() => {
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
                 form.reset();
                 currentPage = 0;
                 showPage(currentPage);
-            }, 5000); // 5-second pause
-
+                rotateQuestions();
+            }, config.resetTime);
         });
 
         // Network status listeners
         window.addEventListener('online', () => {
-            console.log("Device is online. Attempting to sync...");
             syncData();
             updateSyncButtonVisibility();
         });
 
         window.addEventListener('offline', () => {
-            console.log("Device is offline. Sync paused.");
             updateSyncButtonVisibility();
         });
-
-        let typingTimeout;
-        let displayTimeout;
-
-        function typeWriter(text, i, speed) {
-            if (i < text.length) {
-                rotatingQuestionEl.textContent += text.charAt(i);
-                typingTimeout = setTimeout(() => typeWriter(text, i + 1, speed), speed);
-            } else {
-                displayTimeout = setTimeout(rotateQuestions, 4000);
-            }
-        }
-
-        function rotateQuestions() {
-            clearTimeout(typingTimeout);
-            clearTimeout(displayTimeout);
-
-            const currentQuestion = questions[questionIndex];
-            rotatingQuestionEl.textContent = "";
-            questionIndex = (questionIndex + 1) % questions.length;
-            
-            typeWriter(currentQuestion, 0, 50);
-        }
 
         // Initial setup
         showPage(currentPage);
         rotateQuestions();
         updateSyncButtonVisibility();
-        scheduleDailySync();
+        // scheduleDailySync(); // This feature is better implemented server-side for reliability, so it's commented out for now.
         
     </script>
 </body>
