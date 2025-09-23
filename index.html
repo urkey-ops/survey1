@@ -16,25 +16,24 @@
         input[type="radio"]:checked + label {
             transform: scale(1.1);
             box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-            border-color: #3b82f6; /* Tailwind's blue-500 */
+            border-color: #3b82f6;
         }
-        /* Custom styling for the star rating to fill on hover and selection */
         .star-rating input[type="radio"] {
             display: none;
         }
         .star-rating label.star {
             cursor: pointer;
-            color: #d1d5db; /* Tailwind's gray-400 */
+            color: #d1d5db;
             transition: color 0.2s ease, transform 0.2s ease;
         }
         .star-rating input[type="radio"]:checked ~ label.star,
         .star-rating:hover input[type="radio"]:checked ~ label.star {
-            color: #f59e0b; /* Tailwind's amber-500 */
+            color: #f59e0b;
         }
         .star-rating label.star:hover,
         .star-rating label.star:hover ~ label.star,
         .star-rating input[type="radio"]:checked ~ label.star:hover {
-            color: #fcd34d; /* Tailwind's amber-300 */
+            color: #fcd34d;
         }
     </style>
 </head>
@@ -47,7 +46,6 @@
         <div id="statusMessage" class="hidden text-sm"></div>
 
         <form id="surveyForm" class="space-y-6">
-
             <div class="survey-page" data-page="0">
                 <div id="rotatingQuestion" class="block text-gray-700 font-semibold mb-2"></div>
                 <textarea
@@ -59,7 +57,6 @@
                     required
                 ></textarea>
             </div>
-
             <div class="survey-page hidden" data-page="1">
                 <label class="block text-gray-700 font-semibold mb-2">2. Overall, how satisfied were you with your visit today?</label>
                 <div class="flex justify-around items-center space-x-4">
@@ -68,13 +65,11 @@
                         <span class="text-4xl sm:text-5xl">😞</span>
                         <span class="mt-2 text-gray-500 text-xs sm:text-sm">Sad</span>
                     </label>
-
                     <input type="radio" id="emojiNeutral" name="satisfaction" value="Neutral" class="hidden">
                     <label for="emojiNeutral" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
                         <span class="text-4xl sm:text-5xl">😐</span>
                         <span class="mt-2 text-gray-500 text-xs sm:text-sm">Neutral</span>
                     </label>
-
                     <input type="radio" id="emojiHappy" name="satisfaction" value="Happy" class="hidden">
                     <label for="emojiHappy" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
                         <span class="text-4xl sm:text-5xl">😊</span>
@@ -82,7 +77,6 @@
                     </label>
                 </div>
             </div>
-
             <div class="survey-page hidden" data-page="2">
                 <label class="block text-gray-700 font-semibold mb-2">3. How would you rate the cleanliness of the facility?</label>
                 <div class="flex justify-between items-center bg-gray-50 rounded-lg p-4">
@@ -90,23 +84,18 @@
                     <div class="flex space-x-2">
                         <input type="radio" id="clean1" name="cleanliness" value="1" class="hidden">
                         <label for="clean1" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">1</label>
-                        
                         <input type="radio" id="clean2" name="cleanliness" value="2" class="hidden">
                         <label for="clean2" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">2</label>
-                        
                         <input type="radio" id="clean3" name="cleanliness" value="3" class="hidden">
                         <label for="clean3" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">3</label>
-                        
                         <input type="radio" id="clean4" name="cleanliness" value="4" class="hidden">
                         <label for="clean4" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">4</label>
-                        
                         <input type="radio" id="clean5" name="cleanliness" value="5" class="hidden">
                         <label for="clean5" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">5</label>
                     </div>
                     <span class="text-xs text-gray-500">5 (Excellent)</span>
                 </div>
             </div>
-
             <div class="survey-page hidden" data-page="3">
                 <label class="block text-gray-700 font-semibold mb-2">4. How friendly was the volunteer staff?</label>
                 <div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">
@@ -132,7 +121,6 @@
                     </label>
                 </div>
             </div>
-
             <div id="survey-navigation" class="flex justify-between items-center mt-6">
                 <button
                     id="backButton"
@@ -176,27 +164,22 @@
                 page.classList.toggle('hidden', index !== pageIndex);
             });
 
-            // Update navigation buttons
             backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
             if (pageIndex === surveyPages.length - 1) {
-                // When we reach the last page, the next button's type is "submit"
                 nextButton.textContent = 'Submit Survey';
                 nextButton.type = 'submit';
             } else {
-                // For all other pages, the next button's type is "button"
                 nextButton.textContent = 'Next';
                 nextButton.type = 'button';
             }
         }
 
         function validatePage(pageElement) {
-            // Check for textarea validation
             const textarea = pageElement.querySelector('textarea');
             if (textarea && textarea.required && !textarea.value.trim()) {
                 return false;
             }
 
-            // Check for radio button validation
             const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
             if (radioButtons.length > 0) {
                 const isChecked = Array.from(radioButtons).some(radio => radio.checked);
@@ -215,27 +198,41 @@
                 rotatingQuestionEl.textContent += text.charAt(i);
                 typingTimeout = setTimeout(() => typeWriter(text, i + 1, speed), speed);
             } else {
-                // Once typing is complete, show the full question for 4 seconds
                 displayTimeout = setTimeout(rotateQuestions, 4000);
             }
         }
 
         function rotateQuestions() {
-            // Clear any previous timeouts to prevent overlap
             clearTimeout(typingTimeout);
             clearTimeout(displayTimeout);
 
-            // Get the current question and reset the element's text
             const currentQuestion = questions[questionIndex];
             rotatingQuestionEl.textContent = "";
             questionIndex = (questionIndex + 1) % questions.length;
             
-            // Start the typing effect
-            typeWriter(currentQuestion, 0, 50); // 50ms per character
+            typeWriter(currentQuestion, 0, 50);
         }
 
-        // Add event listeners for navigation
+        // This listener now only handles navigation.
         nextButton.addEventListener('click', () => {
+            if (currentPage < surveyPages.length - 1) {
+                const currentPageElement = surveyPages[currentPage];
+                if (validatePage(currentPageElement)) {
+                    statusMessage.style.display = 'none';
+                    currentPage++;
+                    showPage(currentPage);
+                } else {
+                    statusMessage.textContent = 'Please answer the current question to continue.';
+                    statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+                    statusMessage.style.display = 'block';
+                }
+            }
+        });
+
+        // This listener handles the submission via fetch() on the last page.
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
             const currentPageElement = surveyPages[currentPage];
             if (!validatePage(currentPageElement)) {
                 statusMessage.textContent = 'Please answer the current question to continue.';
@@ -243,41 +240,20 @@
                 statusMessage.style.display = 'block';
                 return;
             }
-            statusMessage.style.display = 'none'; // Hide message on success
 
-            if (currentPage < surveyPages.length - 1) {
-                currentPage++;
-                showPage(currentPage);
-            }
-        });
-
-        backButton.addEventListener('click', () => {
-            if (currentPage > 0) {
-                currentPage--;
-                showPage(currentPage);
-            }
-        });
-
-        // Handle the final form submission
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            // Clear any previous messages
             statusMessage.style.display = 'none';
+            statusMessage.textContent = 'Submitting survey...';
+            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
+            statusMessage.style.display = 'block';
 
-            // Collect data from all form fields
             const formData = new FormData(form);
             const data = {
-                question: rotatingQuestionEl.textContent, // Use the current question text
+                question: rotatingQuestionEl.textContent,
                 comments: formData.get('comments'),
                 satisfaction: formData.get('satisfaction'),
                 cleanliness: formData.get('cleanliness'),
                 staff_friendliness: formData.get('staff_friendliness')
             };
-
-            statusMessage.textContent = 'Submitting survey...';
-            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
-            statusMessage.style.display = 'block';
 
             try {
                 const response = await fetch('/api/submit-survey', {
@@ -292,7 +268,7 @@
                     statusMessage.textContent = 'Survey submitted successfully! Thank you.';
                     statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
                     form.reset();
-                    currentPage = 0; // Reset survey to the first page
+                    currentPage = 0;
                     showPage(currentPage);
                 } else {
                     statusMessage.textContent = 'Error submitting survey. Please try again.';
@@ -305,9 +281,8 @@
             }
         });
 
-        // Initialize the survey on page load
         showPage(currentPage);
-        rotateQuestions(); // Start the first question cycle
+        rotateQuestions();
     </script>
 </body>
 </html>
