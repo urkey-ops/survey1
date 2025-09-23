@@ -365,7 +365,6 @@
             
             backButton.style.visibility = appState.currentPage === 0 ? 'hidden' : 'visible';
             nextButton.textContent = (appState.currentPage === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-            nextButton.type = (appState.currentPage === surveyQuestions.length - 1) ? 'submit' : 'button';
 
             if (appState.currentPage === 0) {
                 startQuestionRotation();
@@ -375,32 +374,6 @@
             updateProgressBar();
         };
 
-        const validateCurrentPage = () => {
-            const questionData = surveyQuestions[appState.currentPage];
-            if (!questionData.required) return true;
-
-            let isValid = false;
-            if (questionData.type === 'textarea') {
-                isValid = appState.formData[questionData.name] && appState.formData[questionData.name].trim() !== '';
-            } else {
-                isValid = !!appState.formData[questionData.name];
-            }
-            
-            if (!isValid) {
-                const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
-                if (element) {
-                    element.classList.add('border-red-500');
-                    showTemporaryMessage('Please answer this question to continue.', 'error');
-                }
-            } else {
-                const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
-                if (element) {
-                    element.classList.remove('border-red-500');
-                }
-            }
-            return isValid;
-        };
-
         const saveCurrentPageData = () => {
             const formData = new FormData(form);
             const questionData = surveyQuestions[appState.currentPage];
@@ -408,20 +381,31 @@
             appState.formData[questionData.name] = value;
         };
 
-        const nextPage = () => {
-            saveCurrentPageData();
-            if (!validateCurrentPage()) {
-                return;
+        const validateCurrentPage = () => {
+            const questionData = surveyQuestions[appState.currentPage];
+            if (!questionData.required) return true;
+
+            const value = appState.formData[questionData.name];
+            let isValid = false;
+            
+            if (questionData.type === 'textarea') {
+                isValid = value && value.trim() !== '';
+            } else {
+                isValid = !!value;
             }
-            appState.currentPage++;
-            if (appState.currentPage < surveyQuestions.length) {
-                renderPage(appState.currentPage);
+            
+            const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
+            if (!isValid) {
+                if (element) {
+                    element.classList.add('border-red-500');
+                    showTemporaryMessage('Please answer this question to continue.', 'error');
+                }
+            } else {
+                if (element) {
+                    element.classList.remove('border-red-500');
+                }
             }
-        };
-        
-        const prevPage = () => {
-            appState.currentPage--;
-            renderPage(appState.currentPage);
+            return isValid;
         };
 
         // --- Offline-first and Sync Logic ---
@@ -535,8 +519,28 @@
         };
 
         // --- Event Listeners & Initialization ---
-        nextButton.addEventListener('click', nextPage);
-        backButton.addEventListener('click', prevPage);
+        nextButton.addEventListener('click', () => {
+            saveCurrentPageData();
+            if (!validateCurrentPage()) {
+                return;
+            }
+
+            if (appState.currentPage === surveyQuestions.length - 1) {
+                form.dispatchEvent(new Event('submit', { cancelable: true }));
+            } else {
+                appState.currentPage++;
+                renderPage(appState.currentPage);
+            }
+        });
+
+        backButton.addEventListener('click', () => {
+            if (appState.currentPage > 0) {
+                appState.currentPage--;
+                statusMessage.style.display = 'none';
+                renderPage(appState.currentPage);
+            }
+        });
+
         syncButton.addEventListener('click', syncData);
 
         mainTitle.addEventListener('click', () => {
@@ -557,7 +561,6 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            saveCurrentPageData();
 
             const finalData = { ...appState.formData, id: uuidv4() };
             log("Form submitted. Saving to queue.", finalData);
@@ -585,13 +588,15 @@
             }, config.resetTime);
         });
 
-        // Listen for user input on any form element to pause question rotation
         form.addEventListener('change', (e) => {
             const name = e.target.name;
             const value = e.target.value;
             appState.formData[name] = value;
             if (e.target.type === 'radio') {
-                 nextPage();
+                saveCurrentPageData();
+                if(validateCurrentPage()){
+                    nextButton.click();
+                }
             }
         });
 
