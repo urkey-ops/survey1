@@ -98,9 +98,15 @@
         </button>
 
         <div id="statusMessage" class="hidden text-sm"></div>
+
         <div id="surveyContent">
+            <div id="progressBarContainer" class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" style="width: 0%;"></div>
+            </div>
+
             <form id="surveyForm" class="space-y-6">
                 <div id="questionContainer"></div>
+                
                 <div id="survey-navigation" class="flex justify-between items-center mt-6">
                     <button id="backButton" type="button" class="px-6 py-3 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors" style="visibility: hidden;">
                         Back
@@ -114,6 +120,7 @@
     </div>
 
     <script>
+        // --- DOM Elements & Configuration ---
         const form = document.getElementById('surveyForm');
         const statusMessage = document.getElementById('statusMessage');
         const syncButton = document.getElementById('syncButton');
@@ -123,13 +130,24 @@
         const backButton = document.getElementById('backButton');
         const questionContainer = document.getElementById('questionContainer');
         const surveyContent = document.getElementById('surveyContent');
+        const progressBar = document.getElementById('progressBar');
 
         const DEBUG_MODE = true;
-        function log(message, ...args) {
+        const log = (message, ...args) => {
             if (DEBUG_MODE) {
                 console.log(`[DEBUG] ${message}`, ...args);
             }
-        }
+        };
+
+        const config = {
+            rotationSpeed: 50,
+            rotationDisplayTime: 4000,
+            resetTime: 5000,
+            adminClicksRequired: 5,
+            adminClickTimeout: 3000,
+            inactivityTime: 30000,
+            debounceDelay: 200,
+        };
 
         const surveyQuestions = [
             {
@@ -155,7 +173,8 @@
                     { value: 'Sad', label: 'Sad', emoji: '😞' },
                     { value: 'Neutral', label: 'Neutral', emoji: '😐' },
                     { value: 'Happy', label: 'Happy', emoji: '😊' }
-                ]
+                ],
+                required: true
             },
             {
                 id: 'cleanliness',
@@ -164,10 +183,8 @@
                 question: '3. How would you rate the cleanliness of the facility?',
                 min: 1,
                 max: 5,
-                labels: {
-                    min: '1 (Poor)',
-                    max: '5 (Excellent)'
-                }
+                labels: { min: '1 (Poor)', max: '5 (Excellent)' },
+                required: true
             },
             {
                 id: 'staff_friendliness',
@@ -175,102 +192,109 @@
                 type: 'star-rating',
                 question: '4. How friendly was the volunteer staff?',
                 min: 1,
-                max: 5
+                max: 5,
+                required: true
             }
         ];
 
-        let currentPage = 0;
-        let questionRotationIndex = 0;
-        let typingTimeout;
-        let displayTimeout;
-        let adminClickCount = 0;
-        let adminTimer = null;
-        let inactivityTimeout;
-        let isUserActive = false;
-        let debounceTimer = null;
-
-        const config = {
-            rotationSpeed: 50,
-            rotationDisplayTime: 4000,
-            resetTime: 5000,
-            adminClicksRequired: 5,
-            adminClickTimeout: 3000,
-            inactivityTime: 30000,
-            debounceDelay: 200,
+        // --- Application State ---
+        const appState = {
+            currentPage: 0,
+            formData: {},
+            questionRotationIndex: 0,
+            typingTimeout: null,
+            displayTimeout: null,
+            inactivityTimeout: null,
+            isUserActive: false,
+            debounceTimer: null,
+            adminClickCount: 0,
+            adminTimer: null
         };
 
-        // Helper function to generate a UUID
-        function uuidv4() {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        }
+        // --- Helper Functions ---
+        const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
 
-        // --- Question Rotation & User Interaction Logic ---
-        function startQuestionRotation() {
-            if (currentPage !== 0 || isUserActive) return;
+        const debounce = (func, delay) => {
+            return (...args) => {
+                clearTimeout(appState.debounceTimer);
+                appState.debounceTimer = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
+
+        const updateProgressBar = () => {
+            const progress = (appState.currentPage / (surveyQuestions.length - 1)) * 100;
+            progressBar.style.width = `${progress}%`;
+        };
+
+        const showTemporaryMessage = (message, type = 'info') => {
+            const className = type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+            statusMessage.textContent = message;
+            statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
+            statusMessage.style.display = 'block';
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        };
+
+        // --- Question Rotation Logic ---
+        const startQuestionRotation = () => {
+            if (appState.currentPage !== 0 || appState.isUserActive) return;
             log("Starting question rotation.");
             rotateQuestions();
-        }
+        };
 
-        function stopQuestionRotation() {
+        const stopQuestionRotation = () => {
             log("Stopping question rotation.");
-            clearTimeout(typingTimeout);
-            clearTimeout(displayTimeout);
-            typingTimeout = null;
-            displayTimeout = null;
-        }
+            clearTimeout(appState.typingTimeout);
+            clearTimeout(appState.displayTimeout);
+            appState.typingTimeout = null;
+            appState.displayTimeout = null;
+        };
 
-        function handleUserActivity() {
+        const handleUserActivity = () => {
             log("User activity detected. Pausing rotation.");
-            isUserActive = true;
+            appState.isUserActive = true;
             stopQuestionRotation();
-            clearTimeout(inactivityTimeout);
-            inactivityTimeout = setTimeout(() => {
+            clearTimeout(appState.inactivityTimeout);
+            appState.inactivityTimeout = setTimeout(() => {
                 log("User inactive. Resetting flag and starting rotation.");
-                isUserActive = false;
+                appState.isUserActive = false;
                 startQuestionRotation();
             }, config.inactivityTime);
-        }
+        };
 
-        function typeWriter(text, i) {
+        const typeWriter = (text, i) => {
             const questionElement = questionContainer.querySelector('#rotatingQuestion');
             if (i < text.length) {
                 questionElement.textContent += text.charAt(i);
-                typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
+                appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
             } else {
-                if (!isUserActive) {
-                    displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
+                if (!appState.isUserActive) {
+                    appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
                 }
             }
-        }
+        };
 
-        function rotateQuestions() {
+        const rotateQuestions = () => {
             const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
             if (!rotatingQuestionEl) return;
             stopQuestionRotation();
-            if (isUserActive) {
-                log("User is still active. Not starting new question yet.");
+            if (appState.isUserActive) {
                 return;
             }
             const questionData = surveyQuestions[0];
-            const currentQuestion = questionData.rotatingText[questionRotationIndex];
+            const currentQuestion = questionData.rotatingText[appState.questionRotationIndex];
             rotatingQuestionEl.textContent = "";
-            questionRotationIndex = (questionRotationIndex + 1) % questionData.rotatingText.length;
+            appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
             typeWriter(currentQuestion, 0);
-        }
-
-        const debouncedUserActivity = (func, delay) => {
-            return function(...args) {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => func.apply(this, args), delay);
-            };
         };
-        const debouncedHandleActivity = debouncedUserActivity(handleUserActivity, config.debounceDelay);
+        const debouncedHandleActivity = debounce(handleUserActivity, config.debounceDelay);
 
-        // --- Survey Page & Validation Logic ---
-        function renderPage(pageIndex) {
+        // --- Survey Page Logic ---
+        const renderPage = (pageIndex) => {
             const questionData = surveyQuestions[pageIndex];
             if (!questionData) return;
 
@@ -287,14 +311,15 @@
                             class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
                             placeholder="${questionData.placeholder}"
                             required
-                        ></textarea>
+                        >${appState.formData[questionData.name] || ''}</textarea>
                     `;
                     break;
                 case 'emoji-radio':
                     html += `<div class="flex justify-around items-center space-x-4">`;
                     questionData.options.forEach(option => {
+                        const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="hidden">
+                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="hidden" ${checked}>
                             <label for="${questionData.id + option.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
                                 <span class="text-4xl sm:text-5xl">${option.emoji}</span>
                                 <span class="mt-2 text-gray-500 text-xs sm:text-sm">${option.label}</span>
@@ -310,8 +335,9 @@
                             <div class="flex space-x-2">
                     `;
                     for (let i = questionData.min; i <= questionData.max; i++) {
+                        const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="hidden">
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="hidden" ${checked}>
                             <label for="${questionData.id + i}" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">${i}</label>
                         `;
                     }
@@ -324,8 +350,9 @@
                 case 'star-rating':
                     html += `<div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">`;
                     for (let i = questionData.max; i >= questionData.min; i--) {
+                        const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}">
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" ${checked}>
                             <label for="${questionData.id + i}" class="star">
                                 <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                             </label>
@@ -336,41 +363,69 @@
             }
             questionContainer.innerHTML = html;
             
-            backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
-            nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
+            backButton.style.visibility = appState.currentPage === 0 ? 'hidden' : 'visible';
+            nextButton.textContent = (appState.currentPage === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
+            nextButton.type = (appState.currentPage === surveyQuestions.length - 1) ? 'submit' : 'button';
 
-            if (pageIndex === 0) {
+            if (appState.currentPage === 0) {
                 startQuestionRotation();
             } else {
                 stopQuestionRotation();
             }
-        }
+            updateProgressBar();
+        };
 
-        function validateCurrentPage() {
-            const questionData = surveyQuestions[currentPage];
+        const validateCurrentPage = () => {
+            const questionData = surveyQuestions[appState.currentPage];
+            if (!questionData.required) return true;
+
             let isValid = false;
             if (questionData.type === 'textarea') {
-                const textarea = document.getElementById(questionData.id);
-                isValid = textarea && textarea.value.trim() !== '';
+                isValid = appState.formData[questionData.name] && appState.formData[questionData.name].trim() !== '';
             } else {
-                const radioButtons = document.getElementsByName(questionData.name);
-                isValid = Array.from(radioButtons).some(radio => radio.checked);
+                isValid = !!appState.formData[questionData.name];
+            }
+            
+            if (!isValid) {
+                const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
+                if (element) {
+                    element.classList.add('border-red-500');
+                    showTemporaryMessage('Please answer this question to continue.', 'error');
+                }
+            } else {
+                const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
+                if (element) {
+                    element.classList.remove('border-red-500');
+                }
             }
             return isValid;
-        }
+        };
 
-        function showTemporaryMessage(message, type = 'info') {
-            const className = type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
-            statusMessage.textContent = message;
-            statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
-            statusMessage.style.display = 'block';
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-            }, 5000);
-        }
+        const saveCurrentPageData = () => {
+            const formData = new FormData(form);
+            const questionData = surveyQuestions[appState.currentPage];
+            const value = formData.get(questionData.name);
+            appState.formData[questionData.name] = value;
+        };
+
+        const nextPage = () => {
+            saveCurrentPageData();
+            if (!validateCurrentPage()) {
+                return;
+            }
+            appState.currentPage++;
+            if (appState.currentPage < surveyQuestions.length) {
+                renderPage(appState.currentPage);
+            }
+        };
+        
+        const prevPage = () => {
+            appState.currentPage--;
+            renderPage(appState.currentPage);
+        };
 
         // --- Offline-first and Sync Logic ---
-        function getSurveyQueue() {
+        const getSurveyQueue = () => {
             try {
                 const queue = JSON.parse(localStorage.getItem('surveyQueue'));
                 return Array.isArray(queue) ? queue : [];
@@ -378,17 +433,17 @@
                 console.error("Failed to parse survey queue from localStorage.", e);
                 return [];
             }
-        }
+        };
 
-        function saveSurveyToQueue(data) {
+        const saveSurveyToQueue = (data) => {
             log("Saving new survey to local queue.", data);
             const queue = getSurveyQueue();
             queue.push(data);
             localStorage.setItem('surveyQueue', JSON.stringify(queue));
             updateSyncButtonVisibility();
-        }
+        };
 
-        async function syncData() {
+        const syncData = async () => {
             const queue = getSurveyQueue();
             if (queue.length === 0 || !navigator.onLine) {
                 log("Sync not needed or offline.");
@@ -403,8 +458,7 @@
             let successfullySyncedCount = 0;
             let failedToSync = false;
 
-            for (let i = 0; i < remainingSubmissions.length; i++) {
-                const surveyData = remainingSubmissions[i];
+            for (const surveyData of remainingSubmissions) {
                 try {
                     const response = await fetch('/api/submit-survey', {
                         method: 'POST',
@@ -439,9 +493,9 @@
             } else {
                 showTemporaryMessage('Sync failed. Please check your internet connection.', 'error');
             }
-        }
+        };
 
-        function updateSyncButtonVisibility(failedToSync = false) {
+        const updateSyncButtonVisibility = (failedToSync = false) => {
             const queue = getSurveyQueue();
             if (queue.length > 0 && navigator.onLine) {
                 syncButton.classList.remove('hidden');
@@ -452,9 +506,9 @@
             } else {
                 syncButton.classList.add('hidden');
             }
-        }
+        };
         
-        function clearQueue() {
+        const clearQueue = () => {
             const queue = getSurveyQueue();
             if (queue.length > 0) {
                 if (confirm(`Are you sure you want to clear ${queue.length} unsynced submissions? This action cannot be undone.`)) {
@@ -467,9 +521,9 @@
                 log("No unsynced data to clear.");
                 showTemporaryMessage('No unsynced data to clear.');
             }
-        }
+        };
 
-        function scheduleDailySync() {
+        const scheduleDailySync = () => {
             const now = new Date();
             const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0);
             if (now > syncTime) {
@@ -478,43 +532,22 @@
             const delay = syncTime.getTime() - now.getTime();
             log(`Scheduled next sync for ${syncTime.toLocaleString()}. Delay: ${delay / 1000} seconds.`);
             setTimeout(syncData, delay);
-        }
+        };
 
         // --- Event Listeners & Initialization ---
-        nextButton.addEventListener('click', () => {
-            if (!validateCurrentPage()) {
-                showTemporaryMessage('Please answer the current question to continue.', 'error');
-                return;
-            }
-            
-            currentPage++;
-            if (currentPage < surveyQuestions.length) {
-                renderPage(currentPage);
-            } else {
-                // All questions answered, dispatch submit event
-                form.dispatchEvent(new Event('submit', { cancelable: true }));
-            }
-        });
-        
-        backButton.addEventListener('click', () => {
-            if (currentPage > 0) {
-                currentPage--;
-                renderPage(currentPage);
-                statusMessage.style.display = 'none';
-            }
-        });
-
+        nextButton.addEventListener('click', nextPage);
+        backButton.addEventListener('click', prevPage);
         syncButton.addEventListener('click', syncData);
 
         mainTitle.addEventListener('click', () => {
-            adminClickCount++;
-            if (adminClickCount === 1) {
-                adminTimer = setTimeout(() => {
-                    adminClickCount = 0;
+            appState.adminClickCount++;
+            if (appState.adminClickCount === 1) {
+                appState.adminTimer = setTimeout(() => {
+                    appState.adminClickCount = 0;
                 }, config.adminClickTimeout);
-            } else if (adminClickCount >= config.adminClicksRequired) {
-                clearTimeout(adminTimer);
-                adminClickCount = 0;
+            } else if (appState.adminClickCount >= config.adminClicksRequired) {
+                clearTimeout(appState.adminTimer);
+                appState.adminClickCount = 0;
                 adminClearButton.classList.toggle('hidden');
                 showTemporaryMessage('Admin button toggled.');
             }
@@ -524,15 +557,11 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(form);
-            const data = {};
-            formData.forEach((value, key) => {
-                data[key] = value;
-            });
-            data.id = uuidv4();
-            data.question_text = surveyQuestions.map(q => q.question);
+            saveCurrentPageData();
 
-            saveSurveyToQueue(data);
+            const finalData = { ...appState.formData, id: uuidv4() };
+            log("Form submitted. Saving to queue.", finalData);
+            saveSurveyToQueue(finalData);
             
             surveyContent.style.display = 'none';
             statusMessage.style.display = 'block';
@@ -550,9 +579,20 @@
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
                 form.reset();
-                currentPage = 0;
-                renderPage(currentPage);
+                appState.currentPage = 0;
+                appState.formData = {};
+                renderPage(appState.currentPage);
             }, config.resetTime);
+        });
+
+        // Listen for user input on any form element to pause question rotation
+        form.addEventListener('change', (e) => {
+            const name = e.target.name;
+            const value = e.target.value;
+            appState.formData[name] = value;
+            if (e.target.type === 'radio') {
+                 nextPage();
+            }
         });
 
         document.addEventListener('mousemove', debouncedHandleActivity);
@@ -565,7 +605,7 @@
         window.addEventListener('offline', updateSyncButtonVisibility);
 
         // Initial setup
-        renderPage(currentPage);
+        renderPage(appState.currentPage);
         updateSyncButtonVisibility();
         scheduleDailySync();
     </script>
