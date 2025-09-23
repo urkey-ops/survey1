@@ -35,13 +35,20 @@
         .star-rating input[type="radio"]:checked ~ label.star:hover {
             color: #fcd34d;
         }
+        #syncButton.hidden {
+            display: none;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
 
-    <div class="w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl">
+    <div class="w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl relative">
         <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
         <p class="text-center text-gray-500 mb-6">We'd love to hear about your experience.</p>
+        
+        <button id="syncButton" class="hidden absolute top-4 right-4 text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg shadow-md px-4 py-2 transition-colors duration-200">
+            Sync Data
+        </button>
 
         <div id="statusMessage" class="hidden text-sm"></div>
 
@@ -144,6 +151,7 @@
     <script>
         const form = document.getElementById('surveyForm');
         const statusMessage = document.getElementById('statusMessage');
+        const syncButton = document.getElementById('syncButton');
         const surveyPages = document.querySelectorAll('.survey-page');
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
@@ -179,7 +187,6 @@
             if (textarea && textarea.required && !textarea.value.trim()) {
                 return false;
             }
-
             const radioButtons = pageElement.querySelectorAll('input[type="radio"]');
             if (radioButtons.length > 0) {
                 const isChecked = Array.from(radioButtons).some(radio => radio.checked);
@@ -189,31 +196,103 @@
             }
             return true;
         }
+        
+        // --- Offline-first and Sync Logic ---
 
-        let typingTimeout;
-        let displayTimeout;
-
-        function typeWriter(text, i, speed) {
-            if (i < text.length) {
-                rotatingQuestionEl.textContent += text.charAt(i);
-                typingTimeout = setTimeout(() => typeWriter(text, i + 1, speed), speed);
-            } else {
-                displayTimeout = setTimeout(rotateQuestions, 4000);
+        // Get the queue from localStorage or initialize it as an empty array
+        function getSurveyQueue() {
+            try {
+                const queue = JSON.parse(localStorage.getItem('surveyQueue'));
+                return Array.isArray(queue) ? queue : [];
+            } catch (e) {
+                console.error("Failed to parse survey queue from localStorage.", e);
+                return [];
             }
         }
 
-        function rotateQuestions() {
-            clearTimeout(typingTimeout);
-            clearTimeout(displayTimeout);
-
-            const currentQuestion = questions[questionIndex];
-            rotatingQuestionEl.textContent = "";
-            questionIndex = (questionIndex + 1) % questions.length;
-            
-            typeWriter(currentQuestion, 0, 50);
+        function saveSurveyToQueue(data) {
+            const queue = getSurveyQueue();
+            queue.push(data);
+            localStorage.setItem('surveyQueue', JSON.stringify(queue));
+            updateSyncButtonVisibility();
         }
 
-        // This listener now only handles navigation.
+        async function syncData() {
+            const queue = getSurveyQueue();
+            if (queue.length === 0 || !navigator.onLine) {
+                updateSyncButtonVisibility();
+                return;
+            }
+            
+            statusMessage.textContent = `Syncing ${queue.length} survey(s)...`;
+            statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
+            statusMessage.style.display = 'block';
+
+            let successfullySyncedCount = 0;
+            const failedSubmissions = [];
+
+            for (const surveyData of queue) {
+                try {
+                    const response = await fetch('/api/submit-survey', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(surveyData)
+                    });
+
+                    if (response.ok) {
+                        successfullySyncedCount++;
+                    } else {
+                        console.error('API responded with an error:', response.status);
+                        failedSubmissions.push(surveyData);
+                    }
+                } catch (error) {
+                    console.error('Network or API Error:', error);
+                    failedSubmissions.push(surveyData);
+                }
+            }
+
+            localStorage.setItem('surveyQueue', JSON.stringify(failedSubmissions));
+            updateSyncButtonVisibility();
+
+            if (successfullySyncedCount === queue.length) {
+                statusMessage.textContent = 'All surveys synced successfully!';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
+            } else if (successfullySyncedCount > 0) {
+                statusMessage.textContent = `Synced ${successfullySyncedCount} of ${queue.length} surveys. The rest will be retried later.`;
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
+            } else {
+                statusMessage.textContent = 'Sync failed. Please check internet connection.';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+            }
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function updateSyncButtonVisibility() {
+            const queue = getSurveyQueue();
+            if (queue.length > 0 && navigator.onLine) {
+                syncButton.classList.remove('hidden');
+                syncButton.textContent = `Sync Data (${queue.length})`;
+            } else {
+                syncButton.classList.add('hidden');
+            }
+        }
+
+        function scheduleDailySync() {
+            const now = new Date();
+            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0); // 7:00 PM
+            if (now > syncTime) {
+                syncTime.setDate(syncTime.getDate() + 1);
+            }
+            const delay = syncTime.getTime() - now.getTime();
+            setTimeout(syncData, delay);
+            console.log(`Scheduled next sync for ${syncTime.toLocaleString()}.`);
+        }
+
+        // --- Event Listeners and Initial State ---
+        
         nextButton.addEventListener('click', () => {
             if (currentPage < surveyPages.length - 1) {
                 const currentPageElement = surveyPages[currentPage];
@@ -228,8 +307,16 @@
                 }
             }
         });
+        
+        backButton.addEventListener('click', () => {
+            if (currentPage > 0) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        });
 
-        // This listener handles the submission via fetch() on the last page.
+        syncButton.addEventListener('click', syncData);
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -241,8 +328,7 @@
                 return;
             }
 
-            statusMessage.style.display = 'none';
-            statusMessage.textContent = 'Submitting survey...';
+            statusMessage.textContent = 'Saving survey...';
             statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-yellow-100 text-yellow-700 font-medium';
             statusMessage.style.display = 'block';
 
@@ -255,34 +341,44 @@
                 staff_friendliness: formData.get('staff_friendliness')
             };
 
-            try {
-                const response = await fetch('/api/submit-survey', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    statusMessage.textContent = 'Survey submitted successfully! Thank you.';
-                    statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
-                    form.reset();
-                    currentPage = 0;
-                    showPage(currentPage);
-                } else {
-                    statusMessage.textContent = 'Error submitting survey. Please try again.';
-                    statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
-                }
-            } catch (error) {
-                console.error('Network or API Error:', error);
-                statusMessage.textContent = 'Error: Could not connect to the server.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
+            saveSurveyToQueue(data);
+            
+            // Immediately attempt to sync if online
+            if (navigator.onLine) {
+                await syncData();
+            } else {
+                statusMessage.textContent = 'Survey saved. Will sync when online.';
+                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-green-100 text-green-700 font-medium';
+                updateSyncButtonVisibility();
             }
+
+            form.reset();
+            currentPage = 0;
+            showPage(currentPage);
+            
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
         });
 
+        // Network status listeners
+        window.addEventListener('online', () => {
+            console.log("Device is online. Attempting to sync...");
+            syncData();
+            updateSyncButtonVisibility();
+        });
+
+        window.addEventListener('offline', () => {
+            console.log("Device is offline. Sync paused.");
+            updateSyncButtonVisibility();
+        });
+
+        // Initial setup
         showPage(currentPage);
         rotateQuestions();
+        updateSyncButtonVisibility();
+        scheduleDailySync();
+        
     </script>
 </body>
 </html>
