@@ -14,7 +14,6 @@
             font-family: 'Inter', sans-serif;
         }
         
-        /* New: Scoped styles for Emoji and Number Scale questions */
         .emoji-radio-group input[type="radio"]:checked + label,
         .number-scale-group input[type="radio"]:checked + label {
             transform: scale(1.1);
@@ -22,7 +21,6 @@
             border-color: #3b82f6;
         }
         
-        /* Star Rating styles are now scoped */
         .star-rating input[type="radio"] {
             display: none;
         }
@@ -41,10 +39,10 @@
             color: #fcd34d;
         }
         
-        /* Global styles remain the same */
         #syncButton.hidden, #adminClearButton.hidden {
             display: none;
         }
+        
         .checkmark-container {
             display: flex;
             justify-content: center;
@@ -88,6 +86,24 @@
         .sync-loading {
             animation: pulse 1.5s infinite;
         }
+
+        .location-radio-group input[type="radio"]:checked + label {
+            border-color: #3b82f6;
+            background-color: #e2e8f0;
+        }
+
+        /* Visually hidden class for accessibility */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -103,7 +119,7 @@
             Clear Queue
         </button>
 
-        <div id="statusMessage" class="hidden text-sm"></div>
+        <div id="statusMessage" class="hidden text-sm" aria-live="polite"></div>
 
         <div id="surveyContent">
             <div id="progressBarContainer" class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
@@ -153,6 +169,8 @@
             adminClickTimeout: 3000,
             inactivityTime: 30000,
             debounceDelay: 200,
+            maxRetries: 5,
+            baseDelay: 500,
         };
 
         const surveyQuestions = [
@@ -200,6 +218,47 @@
                 min: 1,
                 max: 5,
                 required: true
+            },
+            {
+                id: 'location',
+                name: 'location',
+                type: 'radio',
+                question: 'Where are you visiting from today?',
+                options: [
+                    { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
+                    { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
+                    { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside Atlanta)' },
+                    { value: 'United States (outside GA)', label: 'United States (outside GA)' },
+                    { value: 'Canada', label: 'Canada' },
+                    { value: 'India', label: 'India' },
+                    { value: 'Other', label: 'Other (please specify)' }
+                ],
+                required: false
+            },
+            {
+                id: 'age',
+                name: 'age',
+                type: 'radio',
+                question: 'Which age group do you belong to?',
+                options: [
+                    { value: 'Under 18', label: 'Under 18' },
+                    { value: '18-34', label: '18-34' },
+                    { value: '35-54', label: '35-54' },
+                    { value: '55-64', label: '55-64' },
+                    { value: '65+', label: '65+' }
+                ],
+                required: false
+            },
+            {
+                id: 'contact',
+                name: 'contact',
+                type: 'checkbox-with-fields',
+                question: 'Would you like to stay connected?',
+                fields: [
+                    { id: 'name', name: 'name', label: 'Name', type: 'text', placeholder: 'Enter your name' },
+                    { id: 'email', name: 'email', label: 'Email', type: 'email', placeholder: 'Enter your email' }
+                ],
+                required: false
             }
         ];
 
@@ -216,7 +275,7 @@
             adminClickCount: 0,
             adminTimer: null,
             isTyping: false,
-            stopRotationAfterTyping: false,
+            stopRotationPermanently: false, // New flag
         };
 
         // --- Helper Functions ---
@@ -249,7 +308,7 @@
 
         // --- Question Rotation Logic ---
         const startQuestionRotation = () => {
-            if (appState.currentPage !== 0 || appState.isUserActive) return;
+            if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
             log("Starting question rotation.");
             rotateQuestions();
         };
@@ -267,19 +326,18 @@
             log("User activity detected.");
             clearTimeout(appState.inactivityTimeout);
             appState.isUserActive = true;
-
-            if (appState.isTyping) {
-                log("Typing in progress. Will stop rotation after current sentence.");
-                appState.stopRotationAfterTyping = true;
+            appState.stopRotationPermanently = true; // Stop rotation for the rest of the session
+            
+            if (appState.currentPage === 0) {
+                // Let the current typing animation finish, then stop.
+                // The `typeWriter` function's check handles this.
             } else {
                 stopQuestionRotation();
             }
 
             appState.inactivityTimeout = setTimeout(() => {
-                log("User inactive. Resetting flag and starting rotation.");
+                log("User inactive. Resetting flags.");
                 appState.isUserActive = false;
-                appState.stopRotationAfterTyping = false;
-                startQuestionRotation();
             }, config.inactivityTime);
         };
 
@@ -287,14 +345,12 @@
             const questionElement = questionContainer.querySelector('#rotatingQuestion');
             if (!questionElement) return;
 
-            if (i < text.length && !appState.stopRotationAfterTyping) {
-                appState.isTyping = true;
+            if (i < text.length) {
                 questionElement.textContent += text.charAt(i);
                 appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
             } else {
                 questionElement.textContent = text;
                 appState.isTyping = false;
-                appState.stopRotationAfterTyping = false;
 
                 if (!appState.isUserActive) {
                     appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
@@ -304,7 +360,7 @@
 
         const rotateQuestions = () => {
             const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
-            if (!rotatingQuestionEl || appState.isUserActive) return;
+            if (!rotatingQuestionEl || appState.stopRotationPermanently) return;
             stopQuestionRotation();
             
             const questionData = surveyQuestions[0];
@@ -326,7 +382,7 @@
             switch (questionData.type) {
                 case 'textarea':
                     html = `
-                        <label id="rotatingQuestion" class="block text-gray-700 font-semibold mb-2" aria-live="polite"></label>
+                        <label id="rotatingQuestion" for="${questionData.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${questionData.question}</label>
                         <textarea
                             id="${questionData.id}"
                             name="${questionData.name}"
@@ -338,12 +394,12 @@
                     `;
                     break;
                 case 'emoji-radio':
-                    // Added a new class for scoping the CSS
-                    html += `<div class="emoji-radio-group flex justify-around items-center space-x-4">`;
+                    html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
+                    html += `<div class="emoji-radio-group flex justify-around items-center space-x-4" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     questionData.options.forEach(option => {
                         const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="hidden" ${checked}>
+                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked} aria-label="${option.label} emoji">
                             <label for="${questionData.id + option.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
                                 <span class="text-4xl sm:text-5xl">${option.emoji}</span>
                                 <span class="mt-2 text-gray-500 text-xs sm:text-sm">${option.label}</span>
@@ -353,16 +409,16 @@
                     html += `</div>`;
                     break;
                 case 'number-scale':
-                    // Added a new class for scoping the CSS
+                    html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
                     html += `
-                        <div class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4">
+                        <div class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4" role="radiogroup" aria-labelledby="${questionData.id}Label">
                             <span class="text-xs text-gray-500">${questionData.labels.min}</span>
                             <div class="flex space-x-2">
                     `;
                     for (let i = questionData.min; i <= questionData.max; i++) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="hidden" ${checked}>
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="visually-hidden" ${checked} aria-label="${i}">
                             <label for="${questionData.id + i}" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">${i}</label>
                         `;
                     }
@@ -373,17 +429,54 @@
                     `;
                     break;
                 case 'star-rating':
-                    html += `<div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2">`;
+                    html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
+                    html += `<div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     for (let i = questionData.max; i >= questionData.min; i--) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" ${checked}>
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" ${checked} aria-label="${i} stars">
                             <label for="${questionData.id + i}" class="star">
                                 <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
                             </label>
                         `;
                     }
                     html += `</div>`;
+                    break;
+                case 'radio':
+                    html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
+                    html += `<div class="location-radio-group grid grid-cols-1 sm:grid-cols-2 gap-4" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    questionData.options.forEach(option => {
+                        const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
+                        html += `
+                            <div>
+                                <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked} aria-label="${option.label}">
+                                <label for="${questionData.id + option.value}" class="block w-full py-4 px-6 bg-white border border-gray-300 rounded-lg text-center font-medium cursor-pointer hover:bg-gray-50 transition-colors duration-200">
+                                    ${option.label}
+                                </label>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                    break;
+                case 'checkbox-with-fields':
+                    html = `<p class="text-sm text-gray-500 mb-4">You can optionally provide your contact information to receive updates and news.</p>`;
+                    questionData.fields.forEach(field => {
+                        const value = appState.formData[field.name] || '';
+                        html += `
+                            <div class="mb-4">
+                                <label for="${field.id}" class="block text-sm font-medium text-gray-700">${field.label}</label>
+                                <input type="${field.type}" id="${field.id}" name="${field.name}" placeholder="${field.placeholder}" value="${value}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                            </div>
+                        `;
+                    });
+                    html += `
+                        <div class="flex items-center mt-4">
+                            <input id="newsletterConsent" name="newsletterConsent" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${appState.formData.newsletterConsent === 'Yes' ? 'checked' : ''}>
+                            <label for="newsletterConsent" class="ml-2 block text-sm text-gray-900">
+                                Yes, I would like to subscribe to the newsletter.
+                            </label>
+                        </div>
+                    `;
                     break;
             }
             questionContainer.innerHTML = html;
@@ -402,8 +495,14 @@
         const saveCurrentPageData = () => {
             const formData = new FormData(form);
             const questionData = surveyQuestions[appState.currentPage];
-            const value = formData.get(questionData.name);
-            appState.formData[questionData.name] = value;
+            
+            if (questionData.type === 'checkbox-with-fields') {
+                appState.formData.name = formData.get('name') || '';
+                appState.formData.email = formData.get('email') || '';
+                appState.formData.newsletterConsent = formData.get('newsletterConsent') === 'on' ? 'Yes' : 'No';
+            } else {
+                appState.formData[questionData.name] = formData.get(questionData.name);
+            }
         };
 
         const validateCurrentPage = () => {
@@ -437,17 +536,18 @@
         const getSurveyQueue = () => {
             try {
                 const queue = JSON.parse(localStorage.getItem('surveyQueue'));
-                return Array.isArray(queue) ? queue : [];
+                // Filter out any items that are already scheduled for retry
+                return Array.isArray(queue) ? queue.filter(item => !item.isScheduledForRetry) : [];
             } catch (e) {
                 console.error("Failed to parse survey queue from localStorage.", e);
                 return [];
             }
         };
-
+        
         const saveSurveyToQueue = (data) => {
             log("Saving new survey to local queue.", data);
             const queue = getSurveyQueue();
-            queue.push(data);
+            queue.push({ ...data, retries: 0 });
             localStorage.setItem('surveyQueue', JSON.stringify(queue));
             updateSyncButtonVisibility();
         };
@@ -463,11 +563,11 @@
             syncButton.textContent = 'Syncing...';
             syncButton.classList.add('sync-loading');
             
-            const remainingSubmissions = [...queue];
-            let successfullySyncedCount = 0;
-            let failedToSync = false;
-
-            for (const surveyData of remainingSubmissions) {
+            const pendingQueue = getSurveyQueue();
+            const successfullySynced = [];
+            const failedToSync = [];
+            
+            for (const surveyData of pendingQueue) {
                 try {
                     const response = await fetch('/api/submit-survey', {
                         method: 'POST',
@@ -475,41 +575,52 @@
                         body: JSON.stringify(surveyData)
                     });
                     if (response.ok) {
-                        successfullySyncedCount++;
+                        successfullySynced.push(surveyData);
                         log(`Successfully synced item: ${surveyData.id}`);
-                        const indexToRemove = queue.findIndex(item => item.id === surveyData.id);
-                        if (indexToRemove !== -1) {
-                            queue.splice(indexToRemove, 1);
-                        }
                     } else {
-                        log(`API responded with an error for item ${surveyData.id}: ${response.status}`);
-                        failedToSync = true;
+                        throw new Error(`API error: ${response.status}`);
                     }
                 } catch (error) {
-                    log(`Network or API Error for item ${surveyData.id}:`, error);
-                    failedToSync = true;
+                    log(`Sync failed for item ${surveyData.id}:`, error);
+                    failedToSync.push(surveyData);
                 }
             }
-            
-            localStorage.setItem('surveyQueue', JSON.stringify(queue));
-            syncButton.classList.remove('sync-loading');
-            updateSyncButtonVisibility(failedToSync);
 
-            if (queue.length === 0) {
+            // Process results and update queue
+            let finalQueue = failedToSync.map(item => {
+                item.retries++;
+                // Check if max retries have been reached
+                if (item.retries >= config.maxRetries) {
+                    log(`Max retries reached for ${item.id}. Dropping.`);
+                    return null;
+                }
+                // Calculate exponential backoff delay
+                const delay = config.baseDelay * Math.pow(2, item.retries);
+                log(`Scheduling retry for ${item.id} in ${delay / 1000} seconds.`);
+                setTimeout(syncData, delay);
+                item.isScheduledForRetry = true;
+                return item;
+            }).filter(Boolean); // Filter out items dropped after max retries
+
+            localStorage.setItem('surveyQueue', JSON.stringify(finalQueue));
+            syncButton.classList.remove('sync-loading');
+            updateSyncButtonVisibility(failedToSync.length > 0);
+
+            if (finalQueue.length === 0) {
                 showTemporaryMessage('Sync successful! All data uploaded.');
-            } else if (successfullySyncedCount > 0) {
-                showTemporaryMessage(`Synced ${successfullySyncedCount} of ${remainingSubmissions.length} surveys. Some failed and were kept in the queue.`);
+            } else if (successfullySynced.length > 0) {
+                showTemporaryMessage(`Synced ${successfullySynced.length} of ${queue.length} surveys. Some will be retried later.`);
             } else {
                 showTemporaryMessage('Sync failed. Please check your internet connection.', 'error');
             }
         };
 
-        const updateSyncButtonVisibility = (failedToSync = false) => {
+        const updateSyncButtonVisibility = (hasFailed = false) => {
             const queue = getSurveyQueue();
             if (queue.length > 0 && navigator.onLine) {
                 syncButton.classList.remove('hidden');
                 syncButton.textContent = `Sync Data (${queue.length})`;
-                if (failedToSync) {
+                if (hasFailed) {
                     syncButton.textContent += ' (⚠️)';
                 }
             } else {
@@ -587,7 +698,8 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const finalData = { ...appState.formData, id: uuidv4() };
+            // Add client-side timestamp
+            const finalData = { ...appState.formData, id: uuidv4(), timestamp: new Date().toISOString() };
             log("Form submitted. Saving to queue.", finalData);
             saveSurveyToQueue(finalData);
             
@@ -613,6 +725,7 @@
                 appState.currentPage = 0;
                 appState.formData = {};
                 appState.isUserActive = false;
+                appState.stopRotationPermanently = false; // Reset the flag
                 renderPage(appState.currentPage);
             }, resetDelay);
         });
@@ -620,7 +733,13 @@
         form.addEventListener('change', (e) => {
             const name = e.target.name;
             const value = e.target.value;
-            appState.formData[name] = value;
+            
+            if (surveyQuestions[appState.currentPage].type === 'checkbox-with-fields') {
+                saveCurrentPageData();
+            } else {
+                appState.formData[name] = value;
+            }
+
             if (e.target.type === 'radio') {
                 saveCurrentPageData();
                 if(validateCurrentPage()){
@@ -628,17 +747,19 @@
                 }
             }
         });
-
-        document.addEventListener('mousemove', debouncedHandleActivity);
-        document.addEventListener('mousedown', debouncedHandleActivity);
-        document.addEventListener('keydown', debouncedHandleActivity);
-        document.addEventListener('touchstart', debouncedHandleActivity);
-        document.addEventListener('touchend', debouncedHandleActivity);
-        document.addEventListener('focusin', (e) => {
-            if (e.target.id === 'comments') {
+        
+        // Listen for keyboard input on the comments textarea
+        document.addEventListener('keydown', (e) => {
+            const commentsTextarea = document.getElementById('comments');
+            if (commentsTextarea && document.activeElement === commentsTextarea) {
                 debouncedHandleActivity();
             }
         });
+
+        // Use more general event listeners for overall activity
+        document.addEventListener('mousemove', debouncedHandleActivity);
+        document.addEventListener('mousedown', debouncedHandleActivity);
+        document.addEventListener('touchstart', debouncedHandleActivity);
 
         window.addEventListener('online', syncData);
         window.addEventListener('offline', updateSyncButtonVisibility);
