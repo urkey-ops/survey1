@@ -51,7 +51,7 @@
 
             <!-- Question 1: Text -->
             <div class="survey-page" data-page="0">
-                <label for="comments" class="block text-gray-700 font-semibold mb-2">1. Write us about your experience today. Any comment or suggestion?</label>
+                <div id="rotatingQuestion" class="block text-gray-700 font-semibold mb-2"></div>
                 <textarea
                     id="comments"
                     name="comments"
@@ -165,8 +165,17 @@
         const surveyPages = document.querySelectorAll('.survey-page');
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
+        const rotatingQuestionEl = document.getElementById('rotatingQuestion');
+
+        const questions = [
+            "1. What did you like about your visit today?",
+            "1. What could we do better during your next visit?",
+            "1. Do you have any general comments or suggestions?",
+            "1. What was the most memorable part of your experience?"
+        ];
 
         let currentPage = 0;
+        let questionIndex = 0;
 
         function showPage(pageIndex) {
             surveyPages.forEach((page, index) => {
@@ -200,6 +209,33 @@
                 }
             }
             return true;
+        }
+
+        let typingTimeout;
+        let displayTimeout;
+
+        function typeWriter(text, i, speed) {
+            if (i < text.length) {
+                rotatingQuestionEl.textContent += text.charAt(i);
+                typingTimeout = setTimeout(() => typeWriter(text, i + 1, speed), speed);
+            } else {
+                // Once typing is complete, show the full question for 4 seconds
+                displayTimeout = setTimeout(rotateQuestions, 4000);
+            }
+        }
+
+        function rotateQuestions() {
+            // Clear any previous timeouts to prevent overlap
+            clearTimeout(typingTimeout);
+            clearTimeout(displayTimeout);
+
+            // Get the current question and reset the element's text
+            const currentQuestion = questions[questionIndex];
+            rotatingQuestionEl.textContent = "";
+            questionIndex = (questionIndex + 1) % questions.length;
+            
+            // Start the typing effect
+            typeWriter(currentQuestion, 0, 50); // 50ms per character
         }
 
         // Add event listeners for navigation
@@ -274,6 +310,7 @@
 
         // Initialize the survey on page load
         showPage(currentPage);
+        rotateQuestions(); // Start the first question cycle
     </script>
 </body>
 </html>
