@@ -25,19 +25,58 @@ export default async function handler(request, response) {
   const sheets = google.sheets({ version: 'v4', auth });
 
   try {
-    const { question, comments, satisfaction, cleanliness, staff_friendliness } = request.body;
+    // Extract all fields from the request body, including the new ones.
+    const {
+      id,
+      timestamp,
+      comments,
+      satisfaction,
+      cleanliness,
+      staff_friendliness,
+      location,
+      age,
+      name,
+      email,
+      newsletterConsent
+    } = request.body;
     
-    // The range now includes the new 'question' column.
-    const range = 'Sheet1!A:F';
+    // --- Server-Side Validation ---
+    // Validate required fields to prevent empty submissions
+    if (!comments || !satisfaction || !cleanliness || !staff_friendliness) {
+      console.error('Validation Error: Missing required fields.');
+      return response.status(400).json({ message: 'Missing required survey data.' });
+    }
+    
+    // Optional: Add specific validation for email format if provided
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+      console.error('Validation Error: Invalid email format.');
+      return response.status(400).json({ message: 'Invalid email format.' });
+    }
+    
+    // Optional: Add validation for specific field values (e.g., cleanliness scale)
+    const cleanlinessRating = parseInt(cleanliness);
+    if (isNaN(cleanlinessRating) || cleanlinessRating < 1 || cleanlinessRating > 5) {
+      console.error('Validation Error: Invalid cleanliness rating.');
+      return response.status(400).json({ message: 'Invalid cleanliness rating.' });
+    }
+
+    // The range now includes all new columns. Ensure your Google Sheet's columns match this order.
+    // Example: A = Timestamp, B = ID, C = Comments, D = Satisfaction, E = Cleanliness, F = Staff Friendliness, etc.
+    const range = 'Sheet1!A:K';
 
     const values = [
       [
-        new Date().toLocaleString(), // Timestamp
-        question,
+        timestamp || new Date().toISOString(), // Use client-side timestamp, fall back to server timestamp
+        id,
         comments,
         satisfaction,
         cleanliness,
         staff_friendliness,
+        location,
+        age,
+        name,
+        email,
+        newsletterConsent,
       ],
     ];
 
@@ -45,7 +84,7 @@ export default async function handler(request, response) {
       values,
     };
 
-    // Append the data to the Google Sheet using the corrected spreadsheet ID.
+    // Append the data to the Google Sheet.
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
