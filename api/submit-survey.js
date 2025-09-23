@@ -8,7 +8,6 @@ export default async function handler(request, response) {
   }
 
   // Check if a spreadsheet ID has been configured.
-  // This is a safety check that will prevent the crash before it happens.
   const spreadsheetId = process.env.SPREADSHEET_ID;
   if (!spreadsheetId) {
     console.error('API Error: SPREADSHEET_ID environment variable is missing.');
@@ -17,7 +16,6 @@ export default async function handler(request, response) {
 
   const auth = new google.auth.GoogleAuth({
     credentials: {
-      // These names now match what you saved in Vercel.
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     },
