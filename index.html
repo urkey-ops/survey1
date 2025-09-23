@@ -88,7 +88,7 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
 
     <div class="w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl relative">
-        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Customer Feedback</h1>
+        <h1 id="mainTitle" class="text-3xl font-bold text-center text-gray-800 mb-2 cursor-pointer">Customer Feedback</h1>
         <p class="text-center text-gray-500 mb-6">We'd love to hear about your experience.</p>
         
         <button id="syncButton" class="hidden absolute top-4 right-4 text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg shadow-md px-4 py-2 transition-colors duration-200">
@@ -202,6 +202,7 @@
         const statusMessage = document.getElementById('statusMessage');
         const syncButton = document.getElementById('syncButton');
         const adminClearButton = document.getElementById('adminClearButton');
+        const mainTitle = document.getElementById('mainTitle');
         const surveyPages = document.querySelectorAll('.survey-page');
         const nextButton = document.getElementById('nextButton');
         const backButton = document.getElementById('backButton');
@@ -220,13 +221,15 @@
         let questionIndex = 0;
         let typingTimeout;
         let displayTimeout;
-        let lastTap = 0;
+        let adminClickCount = 0;
+        let adminTimer = null;
 
-        // Configuration object for easy maintenance
         const config = {
-            rotationSpeed: 50, // ms per character
-            rotationDisplayTime: 4000, // ms to display a full question
-            resetTime: 5000 // ms to display the thank you screen
+            rotationSpeed: 50,
+            rotationDisplayTime: 4000,
+            resetTime: 5000,
+            adminClicksRequired: 5,
+            adminClickTimeout: 3000 // ms
         };
 
         function showPage(pageIndex) {
@@ -234,6 +237,7 @@
                 page.classList.toggle('hidden', index !== pageIndex);
             });
             backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
+            
             if (pageIndex === surveyPages.length - 1) {
                 nextButton.textContent = 'Submit Survey';
                 nextButton.type = 'submit';
@@ -253,6 +257,16 @@
                 return Array.from(radioButtons).some(radio => radio.checked);
             }
             return true;
+        }
+
+        function showTemporaryMessage(message, type = 'info') {
+            const className = type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+            statusMessage.textContent = message;
+            statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
+            statusMessage.style.display = 'block';
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
         }
         
         // --- Offline-first and Sync Logic ---
@@ -281,7 +295,6 @@
                 return;
             }
 
-            // Show syncing feedback
             syncButton.textContent = 'Syncing...';
             syncButton.classList.add('sync-loading');
             
@@ -310,9 +323,16 @@
             
             localStorage.setItem('surveyQueue', JSON.stringify(failedSubmissions));
             
-            // Hide syncing feedback and update button
             syncButton.classList.remove('sync-loading');
             updateSyncButtonVisibility();
+
+            if (successfullySyncedCount === queue.length) {
+                showTemporaryMessage('Sync successful! All data uploaded.');
+            } else if (successfullySyncedCount > 0) {
+                showTemporaryMessage(`Synced ${successfullySyncedCount} of ${queue.length} surveys.`);
+            } else {
+                showTemporaryMessage('Sync failed. Please check your internet connection.', 'error');
+            }
         }
 
         function updateSyncButtonVisibility() {
@@ -326,13 +346,15 @@
         }
         
         function clearQueue() {
-            if (confirm("Are you sure you want to clear all unsynced data? This action cannot be undone.")) {
-                localStorage.removeItem('surveyQueue');
-                updateSyncButtonVisibility();
-                statusMessage.textContent = 'Unsynced data cleared.';
-                statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-gray-100 text-gray-700 font-medium';
-                statusMessage.style.display = 'block';
-                setTimeout(() => statusMessage.style.display = 'none', 3000);
+            const queue = getSurveyQueue();
+            if (queue.length > 0) {
+                if (confirm(`Are you sure you want to clear ${queue.length} unsynced submissions? This action cannot be undone.`)) {
+                    localStorage.removeItem('surveyQueue');
+                    updateSyncButtonVisibility();
+                    showTemporaryMessage('Unsynced data cleared.');
+                }
+            } else {
+                showTemporaryMessage('No unsynced data to clear.');
             }
         }
 
@@ -356,13 +378,11 @@
             typeWriter(currentQuestion, 0);
         }
 
-        // Pause rotation when user interacts with the textarea
         commentsTextarea.addEventListener('focus', () => {
             clearTimeout(typingTimeout);
             clearTimeout(displayTimeout);
         });
 
-        // Resume rotation if the user leaves the textarea and it's empty
         commentsTextarea.addEventListener('blur', () => {
             if (commentsTextarea.value.trim() === '') {
                 displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
@@ -376,8 +396,7 @@
             const isPageValid = validatePage(currentPageElement);
 
             if (isPageValid) {
-                // Clear any validation styling and message
-                currentPageElement.querySelectorAll('textarea, input[type="radio"]').forEach(el => {
+                currentPageElement.querySelectorAll('textarea, input[type="radio"], label').forEach(el => {
                     el.classList.remove('border-red-500');
                     if (el.nextElementSibling) el.nextElementSibling.classList.remove('border-red-500');
                 });
@@ -390,15 +409,16 @@
                     form.dispatchEvent(new Event('submit', { cancelable: true }));
                 }
             } else {
-                // Show validation message and style invalid fields
                 statusMessage.textContent = 'Please answer the current question to continue.';
                 statusMessage.className = 'block p-4 mb-4 rounded-xl text-center bg-red-100 text-red-700 font-medium';
                 statusMessage.style.display = 'block';
 
-                currentPageElement.querySelectorAll('textarea, input[type="radio"]').forEach(el => {
-                    el.classList.add('border-red-500');
-                    // Add red border to the label for radio buttons
-                    if (el.nextElementSibling) el.nextElementSibling.classList.add('border-red-500');
+                currentPageElement.querySelectorAll('textarea, input[type="radio"], label').forEach(el => {
+                    if (el.tagName === 'LABEL' && el.previousElementSibling.type === 'radio') {
+                        el.classList.add('border-red-500');
+                    } else if (el.tagName === 'TEXTAREA') {
+                        el.classList.add('border-red-500');
+                    }
                 });
             }
         });
@@ -413,15 +433,22 @@
 
         syncButton.addEventListener('click', syncData);
 
-        // Admin button double-tap logic
-        adminClearButton.addEventListener('touchend', (e) => {
-            const currentTime = new Date().getTime();
-            const timeDiff = currentTime - lastTap;
-            if (timeDiff < 500 && timeDiff > 0) { // Double tap within 500ms
-                clearQueue();
+        // Secure Admin Access Logic
+        mainTitle.addEventListener('click', () => {
+            adminClickCount++;
+            if (adminClickCount === 1) {
+                adminTimer = setTimeout(() => {
+                    adminClickCount = 0;
+                }, config.adminClickTimeout);
+            } else if (adminClickCount >= config.adminClicksRequired) {
+                clearTimeout(adminTimer);
+                adminClickCount = 0;
+                adminClearButton.classList.toggle('hidden');
+                showTemporaryMessage('Admin button toggled.');
             }
-            lastTap = currentTime;
         });
+
+        adminClearButton.addEventListener('click', clearQueue);
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -463,7 +490,6 @@
             }, config.resetTime);
         });
 
-        // Network status listeners
         window.addEventListener('online', () => {
             syncData();
             updateSyncButtonVisibility();
@@ -473,12 +499,9 @@
             updateSyncButtonVisibility();
         });
 
-        // Initial setup
         showPage(currentPage);
         rotateQuestions();
         updateSyncButtonVisibility();
-        // scheduleDailySync(); // This feature is better implemented server-side for reliability, so it's commented out for now.
-        
     </script>
 </body>
 </html>
