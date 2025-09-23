@@ -1,12 +1,23 @@
+// This file is the Vercel serverless function for your survey submission API.
 import { google } from 'googleapis';
 
 export default async function handler(request, response) {
+  // Only allow POST requests to this endpoint.
   if (request.method !== 'POST') {
     return response.status(405).json({ message: 'Method Not Allowed' });
   }
 
+  // Check if a spreadsheet ID has been configured.
+  // This is a safety check that will prevent the crash before it happens.
+  const spreadsheetId = process.env.SPREADSHEET_ID;
+  if (!spreadsheetId) {
+    console.error('API Error: SPREADSHEET_ID environment variable is missing.');
+    return response.status(500).json({ message: 'Server configuration error.' });
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
+      // These names now match what you saved in Vercel.
       client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     },
@@ -17,13 +28,13 @@ export default async function handler(request, response) {
 
   try {
     const { question, comments, satisfaction, cleanliness, staff_friendliness } = request.body;
-
-    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    
+    // The range now includes the new 'question' column.
     const range = 'Sheet1!A:F';
 
     const values = [
       [
-        new Date().toLocaleString(),
+        new Date().toLocaleString(), // Timestamp
         question,
         comments,
         satisfaction,
@@ -36,6 +47,7 @@ export default async function handler(request, response) {
       values,
     };
 
+    // Append the data to the Google Sheet using the corrected spreadsheet ID.
     await sheets.spreadsheets.values.append({
       spreadsheetId,
       range,
