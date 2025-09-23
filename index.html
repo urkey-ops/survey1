@@ -232,6 +232,14 @@
             adminClickTimeout: 3000 // ms
         };
 
+        // Helper function to generate a UUID
+        function uuidv4() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
         function showPage(pageIndex) {
             surveyPages.forEach((page, index) => {
                 page.classList.toggle('hidden', index !== pageIndex);
@@ -288,6 +296,7 @@
             updateSyncButtonVisibility();
         }
 
+        // The re-thought sync function
         async function syncData() {
             const queue = getSurveyQueue();
             if (queue.length === 0 || !navigator.onLine) {
@@ -298,10 +307,11 @@
             syncButton.textContent = 'Syncing...';
             syncButton.classList.add('sync-loading');
             
+            const remainingSubmissions = [...queue];
             let successfullySyncedCount = 0;
-            const failedSubmissions = [];
 
-            for (const surveyData of queue) {
+            for (let i = 0; i < remainingSubmissions.length; i++) {
+                const surveyData = remainingSubmissions[i];
                 try {
                     const response = await fetch('/api/submit-survey', {
                         method: 'POST',
@@ -311,25 +321,31 @@
 
                     if (response.ok) {
                         successfullySyncedCount++;
+                        // A successful sync means we can remove it from the queue
+                        const indexToRemove = queue.findIndex(item => item.id === surveyData.id);
+                        if (indexToRemove !== -1) {
+                            queue.splice(indexToRemove, 1);
+                        }
                     } else {
                         console.error('API responded with an error:', response.status);
-                        failedSubmissions.push(surveyData);
                     }
                 } catch (error) {
                     console.error('Network or API Error:', error);
-                    failedSubmissions.push(surveyData);
+                    // If a network error occurs, we break the loop and wait for the next sync attempt
+                    break;
                 }
             }
             
-            localStorage.setItem('surveyQueue', JSON.stringify(failedSubmissions));
+            // Save the updated queue (with successful entries removed)
+            localStorage.setItem('surveyQueue', JSON.stringify(queue));
             
             syncButton.classList.remove('sync-loading');
             updateSyncButtonVisibility();
 
-            if (successfullySyncedCount === queue.length) {
+            if (queue.length === 0) {
                 showTemporaryMessage('Sync successful! All data uploaded.');
             } else if (successfullySyncedCount > 0) {
-                showTemporaryMessage(`Synced ${successfullySyncedCount} of ${queue.length} surveys.`);
+                showTemporaryMessage(`Synced ${successfullySyncedCount} of ${remainingSubmissions.length} surveys. Some failed and were kept in the queue.`);
             } else {
                 showTemporaryMessage('Sync failed. Please check your internet connection.', 'error');
             }
@@ -356,6 +372,17 @@
             } else {
                 showTemporaryMessage('No unsynced data to clear.');
             }
+        }
+
+        function scheduleDailySync() {
+            const now = new Date();
+            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0); // 7:00 PM
+            if (now > syncTime) {
+                syncTime.setDate(syncTime.getDate() + 1);
+            }
+            const delay = syncTime.getTime() - now.getTime();
+            setTimeout(syncData, delay);
+            console.log(`Scheduled next sync for ${syncTime.toLocaleString()}.`);
         }
 
         // --- Question Rotation Logic ---
@@ -401,7 +428,7 @@
                     if (el.nextElementSibling) el.nextElementSibling.classList.remove('border-red-500');
                 });
                 statusMessage.style.display = 'none';
-
+                
                 if (currentPage < surveyPages.length - 1) {
                     currentPage++;
                     showPage(currentPage);
@@ -455,6 +482,8 @@
             
             const formData = new FormData(form);
             const data = {
+                // Generate a UUID to uniquely identify this submission
+                id: uuidv4(),
                 question: rotatingQuestionEl.textContent,
                 comments: formData.get('comments'),
                 satisfaction: formData.get('satisfaction'),
@@ -476,10 +505,6 @@
                 </div>
             `;
             
-            if (navigator.onLine) {
-                syncData();
-            }
-            
             setTimeout(() => {
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
@@ -490,6 +515,7 @@
             }, config.resetTime);
         });
 
+        // Network status listeners
         window.addEventListener('online', () => {
             syncData();
             updateSyncButtonVisibility();
@@ -499,9 +525,11 @@
             updateSyncButtonVisibility();
         });
 
+        // Initial setup
         showPage(currentPage);
         rotateQuestions();
         updateSyncButtonVisibility();
+        scheduleDailySync();
     </script>
 </body>
 </html>
