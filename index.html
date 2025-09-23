@@ -247,7 +247,7 @@
             statusMessage.style.display = 'block';
 
             try {
-                const response = await fetch('/api/submit-survey', {
+                const response = await fetch('https://survey1-iota.vercel.app/api/submit-survey', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
