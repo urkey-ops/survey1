@@ -104,6 +104,23 @@
             white-space: nowrap;
             border-width: 0;
         }
+        .hidden-fields {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        .visible-fields {
+            max-height: 500px; /* Large enough to accommodate the fields */
+            transition: max-height 0.5s ease-in;
+        }
+        .has-error {
+            border-color: #ef4444; /* red-500 */
+        }
+        .error-message {
+            color: #ef4444; /* red-500 */
+            font-size: 0.875rem; /* text-sm */
+            margin-top: 0.25rem; /* mt-1 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
@@ -222,7 +239,7 @@
             {
                 id: 'location',
                 name: 'location',
-                type: 'radio',
+                type: 'radio-with-other',
                 question: 'Where are you visiting from today?',
                 options: [
                     { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
@@ -231,7 +248,7 @@
                     { value: 'United States (outside GA)', label: 'United States (outside GA)' },
                     { value: 'Canada', label: 'Canada' },
                     { value: 'India', label: 'India' },
-                    { value: 'Other', label: 'Other (please specify)' }
+                    { value: 'Other', label: 'Other' }
                 ],
                 required: false
             },
@@ -242,9 +259,8 @@
                 question: 'Which age group do you belong to?',
                 options: [
                     { value: 'Under 18', label: 'Under 18' },
-                    { value: '18-34', label: '18-34' },
-                    { value: '35-54', label: '35-54' },
-                    { value: '55-64', label: '55-64' },
+                    { value: '18-40', label: '18-40' },
+                    { value: '40-65', label: '40-65' },
                     { value: '65+', label: '65+' }
                 ],
                 required: false
@@ -275,7 +291,7 @@
             adminClickCount: 0,
             adminTimer: null,
             isTyping: false,
-            stopRotationPermanently: false, // New flag
+            stopRotationPermanently: false,
         };
 
         // --- Helper Functions ---
@@ -306,6 +322,17 @@
             }, 5000);
         };
 
+        const resetRadioAndCheckboxStates = () => {
+            const radioButtons = document.querySelectorAll('input[type="radio"]');
+            radioButtons.forEach(input => {
+                input.checked = false;
+            });
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(input => {
+                input.checked = false;
+            });
+        };
+
         // --- Question Rotation Logic ---
         const startQuestionRotation = () => {
             if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
@@ -326,11 +353,9 @@
             log("User activity detected.");
             clearTimeout(appState.inactivityTimeout);
             appState.isUserActive = true;
-            appState.stopRotationPermanently = true; // Stop rotation for the rest of the session
+            appState.stopRotationPermanently = true;
             
             if (appState.currentPage === 0) {
-                // Let the current typing animation finish, then stop.
-                // The `typeWriter` function's check handles this.
             } else {
                 stopQuestionRotation();
             }
@@ -374,6 +399,9 @@
 
         // --- Survey Page Logic ---
         const renderPage = (pageIndex) => {
+            // Before rendering, clear any visual artifacts from previous selections.
+            resetRadioAndCheckboxStates();
+            
             const questionData = surveyQuestions[pageIndex];
             if (!questionData) return;
 
@@ -391,6 +419,7 @@
                             placeholder="${questionData.placeholder}"
                             required
                         >${appState.formData[questionData.name] || ''}</textarea>
+                        <span id="${questionData.id}Error" class="error-message hidden"></span>
                     `;
                     break;
                 case 'emoji-radio':
@@ -407,11 +436,12 @@
                         `;
                     });
                     html += `</div>`;
+                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
                     break;
                 case 'number-scale':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
                     html += `
-                        <div class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4" role="radiogroup" aria-labelledby="${questionData.id}Label">
+                        <div id="${questionData.id}Group" class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4" role="radiogroup" aria-labelledby="${questionData.id}Label">
                             <span class="text-xs text-gray-500">${questionData.labels.min}</span>
                             <div class="flex space-x-2">
                     `;
@@ -427,10 +457,11 @@
                             <span class="text-xs text-gray-500">${questionData.labels.max}</span>
                         </div>
                     `;
+                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
                     break;
                 case 'star-rating':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `<div class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    html += `<div id="${questionData.id}Group" class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     for (let i = questionData.max; i >= questionData.min; i--) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
@@ -441,7 +472,9 @@
                         `;
                     }
                     html += `</div>`;
+                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
                     break;
+                case 'radio-with-other':
                 case 'radio':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
                     html += `<div class="location-radio-group grid grid-cols-1 sm:grid-cols-2 gap-4" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
@@ -457,30 +490,54 @@
                         `;
                     });
                     html += `</div>`;
+                    if (questionData.type === 'radio-with-other' && appState.formData[questionData.name] === 'Other') {
+                        const otherValue = appState.formData['otherLocation'] || '';
+                        html += `<div class="mt-4"><input type="text" id="otherLocation" name="otherLocation" placeholder="Please specify" value="${otherValue}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></div>`;
+                    }
+                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
                     break;
                 case 'checkbox-with-fields':
-                    html = `<p class="text-sm text-gray-500 mb-4">You can optionally provide your contact information to receive updates and news.</p>`;
-                    questionData.fields.forEach(field => {
-                        const value = appState.formData[field.name] || '';
-                        html += `
-                            <div class="mb-4">
-                                <label for="${field.id}" class="block text-sm font-medium text-gray-700">${field.label}</label>
-                                <input type="${field.type}" id="${field.id}" name="${field.name}" placeholder="${field.placeholder}" value="${value}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                            </div>
-                        `;
-                    });
-                    html += `
-                        <div class="flex items-center mt-4">
-                            <input id="newsletterConsent" name="newsletterConsent" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${appState.formData.newsletterConsent === 'Yes' ? 'checked' : ''}>
+                    const isChecked = appState.formData.newsletterConsent === 'Yes';
+                    const hiddenClass = isChecked ? 'visible-fields' : 'hidden-fields';
+                    html = `
+                        <p class="text-sm text-gray-500 mb-4">You can optionally provide your contact information to receive updates and news.</p>
+                        <div class="flex items-center">
+                            <input id="newsletterConsent" name="newsletterConsent" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${isChecked ? 'checked' : ''}>
                             <label for="newsletterConsent" class="ml-2 block text-sm text-gray-900">
                                 Yes, I would like to subscribe to the newsletter.
                             </label>
                         </div>
+                        <div id="contactFields" class="${hiddenClass}">
                     `;
+                    questionData.fields.forEach(field => {
+                        const value = appState.formData[field.name] || '';
+                        html += `
+                            <div class="mt-4">
+                                <label for="${field.id}" class="block text-sm font-medium text-gray-700">${field.label}</label>
+                                <input type="${field.type}" id="${field.id}" name="${field.name}" placeholder="${field.placeholder}" value="${value}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+                                <span id="${field.id}Error" class="error-message hidden"></span>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
                     break;
             }
             questionContainer.innerHTML = html;
-            
+
+            // Add event listener to dynamically show/hide fields
+            if (questionData.type === 'checkbox-with-fields') {
+                document.getElementById('newsletterConsent').addEventListener('change', (e) => {
+                    const contactFields = document.getElementById('contactFields');
+                    if (e.target.checked) {
+                        contactFields.classList.remove('hidden-fields');
+                        contactFields.classList.add('visible-fields');
+                    } else {
+                        contactFields.classList.remove('visible-fields');
+                        contactFields.classList.add('hidden-fields');
+                    }
+                });
+            }
+
             backButton.style.visibility = appState.currentPage === 0 ? 'hidden' : 'visible';
             nextButton.textContent = (appState.currentPage === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
 
@@ -497,9 +554,17 @@
             const questionData = surveyQuestions[appState.currentPage];
             
             if (questionData.type === 'checkbox-with-fields') {
+                appState.formData.newsletterConsent = formData.get('newsletterConsent') === 'on' ? 'Yes' : 'No';
                 appState.formData.name = formData.get('name') || '';
                 appState.formData.email = formData.get('email') || '';
-                appState.formData.newsletterConsent = formData.get('newsletterConsent') === 'on' ? 'Yes' : 'No';
+            } else if (questionData.type === 'radio-with-other') {
+                const selectedOption = formData.get(questionData.name);
+                appState.formData[questionData.name] = selectedOption;
+                if (selectedOption === 'Other') {
+                    appState.formData['otherLocation'] = formData.get('otherLocation') || '';
+                } else {
+                    delete appState.formData['otherLocation'];
+                }
             } else {
                 appState.formData[questionData.name] = formData.get(questionData.name);
             }
@@ -507,28 +572,73 @@
 
         const validateCurrentPage = () => {
             const questionData = surveyQuestions[appState.currentPage];
-            if (!questionData.required) return true;
+            
+            // First, clear any previous inline error messages
+            const prevErrorElement = document.getElementById(`${questionData.id}Error`);
+            if (prevErrorElement) {
+                prevErrorElement.classList.add('hidden');
+            }
+            // Also clear errors from contact fields if they were previously shown
+            if (questionData.type === 'checkbox-with-fields') {
+                document.getElementById('name').classList.remove('has-error');
+                document.getElementById('email').classList.remove('has-error');
+                document.getElementById('nameError').classList.add('hidden');
+                document.getElementById('emailError').classList.add('hidden');
+            }
+            
+            let isValid = true;
+            let errorMessage = '';
 
-            const value = appState.formData[questionData.name];
-            let isValid = false;
-            
-            if (questionData.type === 'textarea') {
-                isValid = value && value.trim() !== '';
-            } else {
-                isValid = !!value;
+            if (questionData.type === 'checkbox-with-fields') {
+                // If newsletter consent is checked, validate name and email
+                if (appState.formData.newsletterConsent === 'Yes') {
+                    const nameInput = document.getElementById('name');
+                    const emailInput = document.getElementById('email');
+                    const emailRegex = /^\S+@\S+\.\S+$/;
+
+                    if (!nameInput.value.trim()) {
+                        isValid = false;
+                        document.getElementById('nameError').textContent = 'Name is required.';
+                        document.getElementById('nameError').classList.remove('hidden');
+                        nameInput.classList.add('has-error');
+                    }
+                    if (!emailInput.value.trim() || !emailRegex.test(emailInput.value)) {
+                        isValid = false;
+                        document.getElementById('emailError').textContent = 'A valid email is required.';
+                        document.getElementById('emailError').classList.remove('hidden');
+                        emailInput.classList.add('has-error');
+                    }
+                }
+            } else if (questionData.required) {
+                // Validation for all other required questions
+                let value = appState.formData[questionData.name];
+                
+                if (questionData.type === 'radio-with-other' && value === 'Other') {
+                    value = appState.formData['otherLocation'];
+                }
+                
+                if (questionData.type === 'textarea') {
+                    isValid = value && value.trim() !== '';
+                } else {
+                    isValid = !!value;
+                }
+
+                if (!isValid) {
+                    errorMessage = questionData.type === 'textarea' ? 'Please answer this question to continue.' : 'Please select an option to continue.';
+                    const errorElement = document.getElementById(`${questionData.id}Error`);
+                    if (errorElement) {
+                        errorElement.textContent = errorMessage;
+                        errorElement.classList.remove('hidden');
+                    }
+
+                    // Add red border to the container for radio/star/number groups
+                    const questionGroup = document.getElementById(`${questionData.id}Group`);
+                    if (questionGroup) {
+                        questionGroup.classList.add('border-2', 'border-red-500');
+                    }
+                }
             }
             
-            const element = questionContainer.querySelector(`[name="${questionData.name}"]`);
-            if (!isValid) {
-                if (element) {
-                    element.classList.add('border-red-500');
-                    showTemporaryMessage('Please answer this question to continue.', 'error');
-                }
-            } else {
-                if (element) {
-                    element.classList.remove('border-red-500');
-                }
-            }
             return isValid;
         };
 
@@ -725,22 +835,36 @@
                 appState.currentPage = 0;
                 appState.formData = {};
                 appState.isUserActive = false;
-                appState.stopRotationPermanently = false; // Reset the flag
+                appState.stopRotationPermanently = false;
                 renderPage(appState.currentPage);
             }, resetDelay);
         });
 
         form.addEventListener('change', (e) => {
+            const questionData = surveyQuestions[appState.currentPage];
             const name = e.target.name;
             const value = e.target.value;
             
-            if (surveyQuestions[appState.currentPage].type === 'checkbox-with-fields') {
+            // Clear the error state on change
+            const errorElement = document.getElementById(`${questionData.id}Error`);
+            if (errorElement) {
+                errorElement.classList.add('hidden');
+                const questionGroup = document.getElementById(`${questionData.id}Group`);
+                if (questionGroup) {
+                    questionGroup.classList.remove('border-2', 'border-red-500');
+                }
+            }
+
+            if (questionData.type === 'checkbox-with-fields') {
                 saveCurrentPageData();
+            } else if (questionData.type === 'radio-with-other') {
+                saveCurrentPageData();
+                renderPage(appState.currentPage);
             } else {
                 appState.formData[name] = value;
             }
 
-            if (e.target.type === 'radio') {
+            if (e.target.type === 'radio' && questionData.type !== 'radio-with-other') {
                 saveCurrentPageData();
                 if(validateCurrentPage()){
                     nextButton.click();
@@ -748,7 +872,6 @@
             }
         });
         
-        // Listen for keyboard input on the comments textarea
         document.addEventListener('keydown', (e) => {
             const commentsTextarea = document.getElementById('comments');
             if (commentsTextarea && document.activeElement === commentsTextarea) {
@@ -756,7 +879,6 @@
             }
         });
 
-        // Use more general event listeners for overall activity
         document.addEventListener('mousemove', debouncedHandleActivity);
         document.addEventListener('mousedown', debouncedHandleActivity);
         document.addEventListener('touchstart', debouncedHandleActivity);
@@ -764,7 +886,6 @@
         window.addEventListener('online', syncData);
         window.addEventListener('offline', updateSyncButtonVisibility);
 
-        // Initial setup
         renderPage(appState.currentPage);
         updateSyncButtonVisibility();
         scheduleDailySync();
