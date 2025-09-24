@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         adminClickCount: 0,
         adminTimer: null,
         stopRotationPermanently: false,
-        syncIntervalId: null, // New state for the hourly sync timer
+        syncIntervalId: null,
     };
 
     // --- Helper Functions ---
@@ -175,7 +175,8 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(appState.inactivityTimeout);
         appState.isUserActive = true;
         appState.stopRotationPermanently = true;
-        // CRITICAL FIX: Clear the countdown overlay and timer on activity
+        
+        // Clear the countdown overlay and timer on activity
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -497,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!appState.isUserActive) {
             log("User inactive. Starting auto-submit countdown.");
             
-            // CRITICAL FIX: Clear any existing countdown timer before starting a new one
+            // Clear any existing countdown timer before starting a new one
             if (appState.countdownIntervalId) {
                 clearInterval(appState.countdownIntervalId);
             }
@@ -511,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 countdownSpan.textContent = countdown;
                 if (countdown <= 0) {
                     clearInterval(appState.countdownIntervalId);
-                    // The actual submission logic goes here
                     log("Auto-submitting incomplete survey.");
                     const submission = {
                         id: uuidv4(),
@@ -605,7 +605,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showCompletionScreen = () => {
-        // CRITICAL FIX: Hide the overlay if it was shown for auto-submit
+        // Hide the overlay if it was shown for auto-submit
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -629,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isUserActive = false;
         appState.stopRotationPermanently = false;
         
-        // CRITICAL FIX: Hide the overlay on every reset
+        // Hide the overlay on every reset
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -680,14 +680,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Recommended: Cancel countdown on cancel button click
     cancelButton.addEventListener('click', () => {
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
         overlay.classList.add('hidden');
-        handleUserActivity(); // Restart inactivity timer
+        // CRITICAL FIX: Restart the inactivity timer after the user cancels.
+        handleUserActivity(); 
     });
 
     syncButton.addEventListener('click', syncData);
@@ -710,8 +710,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- Initialization ---
     renderPage(appState.currentPage);
-    handleUserActivity();
+    // CRITICAL FIX: Call handleUserActivity on page load to start the initial timer.
+    handleUserActivity(); 
     
-    // Recommended: Store interval ID for better management
     appState.syncIntervalId = setInterval(syncData, 60 * 60 * 1000); // Attempt to sync every hour
 });
