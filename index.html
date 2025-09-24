@@ -121,9 +121,35 @@
             font-size: 0.875rem; /* text-sm */
             margin-top: 0.25rem; /* mt-1 */
         }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            z-index: 10;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            flex-direction: column; /* Add flex-direction to stack content */
+        }
+        .overlay.visible {
+            opacity: 1;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <div id="overlay" class="overlay" role="status" aria-live="polite">
+        <p id="overlayMessage">Survey auto-submitting due to inactivity...</p>
+        <button id="cancelButton" class="mt-4 px-6 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition-colors hidden">
+            Cancel
+        </button>
+    </div>
 
     <div class="w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl relative">
         <h1 id="mainTitle" class="text-3xl font-bold text-center text-gray-800 mb-2 cursor-pointer">Customer Feedback</h1>
@@ -169,6 +195,9 @@
         const backButton = document.getElementById('backButton');
         const questionContainer = document.getElementById('questionContainer');
         const surveyContent = document.getElementById('surveyContent');
+        const overlay = document.getElementById('overlay');
+        const overlayMessage = document.getElementById('overlayMessage');
+        const cancelButton = document.getElementById('cancelButton');
         const progressBar = document.getElementById('progressBar');
 
         const DEBUG_MODE = true;
@@ -184,7 +213,8 @@
             resetTime: 5000,
             adminClicksRequired: 5,
             adminClickTimeout: 3000,
-            inactivityTime: 30000,
+            inactivityTime: 30000, // 30 seconds
+            autoSubmitCountdown: 5, // 5-second countdown
             debounceDelay: 200,
             maxRetries: 5,
             baseDelay: 500,
@@ -285,7 +315,8 @@
             questionRotationIndex: 0,
             typingTimeout: null,
             displayTimeout: null,
-            inactivityTimeout: null,
+            inactivityTimeout: null, 
+            countdownInterval: null,
             isUserActive: false,
             debounceTimer: null,
             adminClickCount: 0,
@@ -321,7 +352,7 @@
                 statusMessage.style.display = 'none';
             }, 5000);
         };
-
+        
         const resetRadioAndCheckboxStates = () => {
             const radioButtons = document.querySelectorAll('input[type="radio"]');
             radioButtons.forEach(input => {
@@ -348,21 +379,36 @@
             appState.typingTimeout = null;
             appState.displayTimeout = null;
         };
+        
+        // NEW: Inactivity Timer & Countdown Logic
+        const cancelAutoSubmit = () => {
+            log("User activity detected during countdown. Aborting auto-submit.");
+            clearTimeout(appState.inactivityTimeout);
+            clearInterval(appState.countdownInterval);
+            
+            overlayMessage.textContent = "Countdown Canceled. Please continue with your survey.";
+            cancelButton.classList.add('hidden');
+            
+            setTimeout(() => {
+                toggleUserInteraction(true);
+            }, 1500); // Give user a moment to read the message
+        }
 
         const handleUserActivity = () => {
-            log("User activity detected.");
-            clearTimeout(appState.inactivityTimeout);
+            // First, cancel any pending auto-submit or countdown
+            cancelAutoSubmit();
+
+            log("User activity detected. Resetting inactivity timer.");
             appState.isUserActive = true;
             appState.stopRotationPermanently = true;
             
-            if (appState.currentPage === 0) {
-            } else {
+            if (appState.currentPage !== 0) {
                 stopQuestionRotation();
             }
 
             appState.inactivityTimeout = setTimeout(() => {
-                log("User inactive. Resetting flags.");
-                appState.isUserActive = false;
+                log("User inactive. Triggering auto-submit.");
+                autoSubmitSurvey();
             }, config.inactivityTime);
         };
 
@@ -399,7 +445,6 @@
 
         // --- Survey Page Logic ---
         const renderPage = (pageIndex) => {
-            // Before rendering, clear any visual artifacts from previous selections.
             resetRadioAndCheckboxStates();
             
             const questionData = surveyQuestions[pageIndex];
@@ -493,6 +538,7 @@
                     if (questionData.type === 'radio-with-other' && appState.formData[questionData.name] === 'Other') {
                         const otherValue = appState.formData['otherLocation'] || '';
                         html += `<div class="mt-4"><input type="text" id="otherLocation" name="otherLocation" placeholder="Please specify" value="${otherValue}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></div>`;
+                        html += `<span id="otherLocationError" class="error-message hidden"></span>`;
                     }
                     html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
                     break;
@@ -524,7 +570,6 @@
             }
             questionContainer.innerHTML = html;
 
-            // Add event listener to dynamically show/hide fields
             if (questionData.type === 'checkbox-with-fields') {
                 document.getElementById('newsletterConsent').addEventListener('change', (e) => {
                     const contactFields = document.getElementById('contactFields');
@@ -537,6 +582,8 @@
                     }
                 });
             }
+            
+            handleUserActivity();
 
             backButton.style.visibility = appState.currentPage === 0 ? 'hidden' : 'visible';
             nextButton.textContent = (appState.currentPage === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
@@ -573,24 +620,32 @@
         const validateCurrentPage = () => {
             const questionData = surveyQuestions[appState.currentPage];
             
-            // First, clear any previous inline error messages
             const prevErrorElement = document.getElementById(`${questionData.id}Error`);
             if (prevErrorElement) {
                 prevErrorElement.classList.add('hidden');
+                const questionGroup = document.getElementById(`${questionData.id}Group`);
+                if (questionGroup) {
+                    questionGroup.classList.remove('border-2', 'border-red-500');
+                }
             }
-            // Also clear errors from contact fields if they were previously shown
             if (questionData.type === 'checkbox-with-fields') {
                 document.getElementById('name').classList.remove('has-error');
                 document.getElementById('email').classList.remove('has-error');
                 document.getElementById('nameError').classList.add('hidden');
                 document.getElementById('emailError').classList.add('hidden');
             }
-            
+            if (questionData.type === 'radio-with-other') {
+                const otherLocationInput = document.getElementById('otherLocation');
+                if (otherLocationInput) {
+                    otherLocationInput.classList.remove('has-error');
+                    document.getElementById('otherLocationError').classList.add('hidden');
+                }
+            }
+
             let isValid = true;
             let errorMessage = '';
 
             if (questionData.type === 'checkbox-with-fields') {
-                // If newsletter consent is checked, validate name and email
                 if (appState.formData.newsletterConsent === 'Yes') {
                     const nameInput = document.getElementById('name');
                     const emailInput = document.getElementById('email');
@@ -610,14 +665,22 @@
                     }
                 }
             } else if (questionData.required) {
-                // Validation for all other required questions
                 let value = appState.formData[questionData.name];
                 
-                if (questionData.type === 'radio-with-other' && value === 'Other') {
-                    value = appState.formData['otherLocation'];
-                }
-                
-                if (questionData.type === 'textarea') {
+                if (questionData.type === 'radio-with-other') {
+                    if (value === 'Other') {
+                        value = appState.formData['otherLocation'];
+                        const otherLocationInput = document.getElementById('otherLocation');
+                        if (!value || value.trim() === '') {
+                            isValid = false;
+                            document.getElementById('otherLocationError').textContent = 'Please specify where you are from.';
+                            document.getElementById('otherLocationError').classList.remove('hidden');
+                            otherLocationInput.classList.add('has-error');
+                        }
+                    } else if (!value) {
+                         isValid = false;
+                    }
+                } else if (questionData.type === 'textarea') {
                     isValid = value && value.trim() !== '';
                 } else {
                     isValid = !!value;
@@ -631,7 +694,6 @@
                         errorElement.classList.remove('hidden');
                     }
 
-                    // Add red border to the container for radio/star/number groups
                     const questionGroup = document.getElementById(`${questionData.id}Group`);
                     if (questionGroup) {
                         questionGroup.classList.add('border-2', 'border-red-500');
@@ -642,11 +704,77 @@
             return isValid;
         };
 
+        // NEW: Inactivity & Auto-Submit Logic
+        const toggleUserInteraction = (enable) => {
+            const interactiveElements = form.querySelectorAll('input, button, textarea, label');
+            interactiveElements.forEach(el => {
+                if (enable) {
+                    el.removeAttribute('disabled');
+                    el.style.pointerEvents = 'auto';
+                } else {
+                    el.setAttribute('disabled', 'true');
+                    el.style.pointerEvents = 'none';
+                }
+            });
+
+            if (enable) {
+                overlay.classList.remove('visible');
+                overlay.style.display = 'none';
+            } else {
+                overlay.style.display = 'flex';
+                setTimeout(() => overlay.classList.add('visible'), 10);
+            }
+        };
+
+        const autoSubmitSurvey = () => {
+            const hasPartialData = Object.keys(appState.formData).length > 0;
+            if (hasPartialData) {
+                log("User inactive. Initiating auto-submit countdown.");
+                toggleUserInteraction(false); 
+
+                let countdown = config.autoSubmitCountdown;
+                overlayMessage.textContent = `Auto-submitting in ${countdown}. Interact or press Cancel to stop.`;
+                cancelButton.classList.remove('hidden');
+
+                appState.countdownInterval = setInterval(() => {
+                    countdown--;
+                    overlayMessage.textContent = `Auto-submitting in ${countdown}. Interact or press Cancel to stop.`;
+                    
+                    if (countdown <= 0) {
+                        clearInterval(appState.countdownInterval);
+                        log("Countdown finished. Auto-submitting partial survey.");
+                        const finalData = { 
+                            ...appState.formData, 
+                            id: uuidv4(), 
+                            timestamp: new Date().toISOString(),
+                            isPartial: true
+                        };
+                        saveSurveyToQueue(finalData);
+                        resetSurveyAndUI();
+                    }
+                }, 1000);
+            } else {
+                log("No data to submit. Resetting survey to start page.");
+                resetSurveyAndUI();
+            }
+        };
+        
+        const resetSurveyAndUI = () => {
+            clearTimeout(appState.inactivityTimeout);
+            clearInterval(appState.countdownInterval);
+            form.reset();
+            appState.currentPage = 0;
+            appState.formData = {};
+            appState.isUserActive = false;
+            appState.stopRotationPermanently = false;
+            renderPage(appState.currentPage);
+            toggleUserInteraction(true);
+        };
+        
         // --- Offline-first and Sync Logic ---
         const getSurveyQueue = () => {
             try {
                 const queue = JSON.parse(localStorage.getItem('surveyQueue'));
-                // Filter out any items that are already scheduled for retry
                 return Array.isArray(queue) ? queue.filter(item => !item.isScheduledForRetry) : [];
             } catch (e) {
                 console.error("Failed to parse survey queue from localStorage.", e);
@@ -696,21 +824,18 @@
                 }
             }
 
-            // Process results and update queue
             let finalQueue = failedToSync.map(item => {
                 item.retries++;
-                // Check if max retries have been reached
                 if (item.retries >= config.maxRetries) {
                     log(`Max retries reached for ${item.id}. Dropping.`);
                     return null;
                 }
-                // Calculate exponential backoff delay
                 const delay = config.baseDelay * Math.pow(2, item.retries);
                 log(`Scheduling retry for ${item.id} in ${delay / 1000} seconds.`);
                 setTimeout(syncData, delay);
                 item.isScheduledForRetry = true;
                 return item;
-            }).filter(Boolean); // Filter out items dropped after max retries
+            }).filter(Boolean);
 
             localStorage.setItem('surveyQueue', JSON.stringify(finalQueue));
             syncButton.classList.remove('sync-loading');
@@ -766,6 +891,10 @@
 
         // --- Event Listeners & Initialization ---
         nextButton.addEventListener('click', () => {
+            // Explicitly cancel any timers to prevent race conditions
+            clearTimeout(appState.inactivityTimeout);
+            clearInterval(appState.countdownInterval);
+            
             saveCurrentPageData();
             if (!validateCurrentPage()) {
                 return;
@@ -781,6 +910,9 @@
 
         backButton.addEventListener('click', () => {
             if (appState.currentPage > 0) {
+                // Explicitly cancel any timers
+                clearTimeout(appState.inactivityTimeout);
+                clearInterval(appState.countdownInterval);
                 appState.currentPage--;
                 statusMessage.style.display = 'none';
                 renderPage(appState.currentPage);
@@ -788,6 +920,7 @@
         });
 
         syncButton.addEventListener('click', syncData);
+        cancelButton.addEventListener('click', cancelAutoSubmit);
 
         mainTitle.addEventListener('click', () => {
             appState.adminClickCount++;
@@ -808,7 +941,10 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Add client-side timestamp
+            // Clear the timers explicitly on submission
+            clearTimeout(appState.inactivityTimeout);
+            clearInterval(appState.countdownInterval);
+            
             const finalData = { ...appState.formData, id: uuidv4(), timestamp: new Date().toISOString() };
             log("Form submitted. Saving to queue.", finalData);
             saveSurveyToQueue(finalData);
@@ -831,12 +967,7 @@
             setTimeout(() => {
                 statusMessage.style.display = 'none';
                 surveyContent.style.display = 'block';
-                form.reset();
-                appState.currentPage = 0;
-                appState.formData = {};
-                appState.isUserActive = false;
-                appState.stopRotationPermanently = false;
-                renderPage(appState.currentPage);
+                resetSurveyAndUI();
             }, resetDelay);
         });
 
@@ -845,8 +976,7 @@
             const name = e.target.name;
             const value = e.target.value;
             
-            // Clear the error state on change
-            const errorElement = document.getElementById(`${questionData.id}Error`);
+            const errorElement = document.getElementById(`${e.target.id}Error`) || document.getElementById(`${questionData.id}Error`);
             if (errorElement) {
                 errorElement.classList.add('hidden');
                 const questionGroup = document.getElementById(`${questionData.id}Group`);
@@ -854,6 +984,13 @@
                     questionGroup.classList.remove('border-2', 'border-red-500');
                 }
             }
+            if (e.target.id) {
+                const element = document.getElementById(e.target.id);
+                if (element) {
+                    element.classList.remove('has-error');
+                }
+            }
+
 
             if (questionData.type === 'checkbox-with-fields') {
                 saveCurrentPageData();
