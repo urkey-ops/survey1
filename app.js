@@ -486,20 +486,33 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncData(); // Attempt to sync immediately after completion
     };
 
-    const autoSubmitSurvey = () => {
-        if (!appState.isUserActive) {
-            log("Auto-submitting incomplete survey.");
-            const submission = {
-                id: uuidv4(),
-                timestamp: new Date().toISOString(),
-                data: appState.formData,
-                is_incomplete: true
-            };
-            storeSubmission(submission);
-            resetSurvey();
-            syncData();
-        }
-    };
+  const autoSubmitSurvey = () => {
+    if (!appState.isUserActive) {
+        log("User inactive. Starting auto-submit countdown.");
+        overlay.classList.remove('hidden'); // Show the overlay
+        let countdown = config.autoSubmitCountdown;
+        countdownSpan.textContent = countdown;
+        
+        appState.countdownIntervalId = setInterval(() => {
+            countdown--;
+            countdownSpan.textContent = countdown;
+            if (countdown <= 0) {
+                clearInterval(appState.countdownIntervalId);
+                // The actual submission logic goes here
+                log("Auto-submitting incomplete survey.");
+                const submission = {
+                    id: uuidv4(),
+                    timestamp: new Date().toISOString(),
+                    data: appState.formData,
+                    is_incomplete: true
+                };
+                storeSubmission(submission);
+                resetSurvey();
+                syncData();
+            }
+        }, 1000);
+    }
+};
 
     // --- Data Storage and API Communication ---
     const getStoredSubmissions = () => {
