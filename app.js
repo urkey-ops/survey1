@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusMessage = document.getElementById('statusMessage');
     const syncButton = document.getElementById('syncButton');
     const adminClearButton = document.getElementById('adminClearButton');
+    const hideAdminButton = document.getElementById('hideAdminButton');
     const mainTitle = document.getElementById('mainTitle');
     const nextButton = document.getElementById('nextButton');
     const backButton = document.getElementById('backButton');
@@ -274,10 +275,10 @@ document.addEventListener('DOMContentLoaded', () => {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
                 <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                     ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
-                    `).join('')}
+                        ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
+                            <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
+                            <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
+                        `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
@@ -423,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
             errorSpan.classList.remove('hidden');
         }
         if (fieldInput) {
-            fieldInput.closest('.emoji-radio-group, .number-scale-group, .star-rating') ?.classList.add('has-error');
+            fieldInput.closest('.emoji-radio-group, .number-scale-group, .star-rating')?.classList.add('has-error');
             fieldInput.classList.add('has-error');
         }
     };
@@ -485,6 +486,21 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncData(); // Attempt to sync immediately after completion
     };
 
+    const autoSubmitSurvey = () => {
+        if (!appState.isUserActive) {
+            log("Auto-submitting incomplete survey.");
+            const submission = {
+                id: uuidv4(),
+                timestamp: new Date().toISOString(),
+                data: appState.formData,
+                is_incomplete: true
+            };
+            storeSubmission(submission);
+            resetSurvey();
+            syncData();
+        }
+    };
+
     // --- Data Storage and API Communication ---
     const getStoredSubmissions = () => {
         try {
@@ -516,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
             log("No offline submissions to sync.");
+            showTemporaryMessage("All data is synced.", "success");
             return;
         }
         if (!navigator.onLine) {
@@ -538,7 +555,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 successfullySyncedIds.push(submission.id);
                 log(`Successfully synced submission ID: ${submission.id}`);
             } catch (error) {
-                // **IMPROVEMENT**: Log error and continue, don't stop the whole sync process
                 console.error(`Sync failed for submission ID: ${submission.id}. Will retry later.`, error);
             }
         }
@@ -586,6 +602,14 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleUI(true);
     };
 
+    // --- Admin Control Logic ---
+    const hideAdminControls = () => {
+        syncButton.classList.add('hidden');
+        adminClearButton.classList.add('hidden');
+        hideAdminButton.classList.add('hidden');
+        showTemporaryMessage("Admin controls hidden.", "info");
+    };
+
     // --- Event Handlers ---
     nextButton.addEventListener('click', (e) => {
         e.preventDefault();
@@ -610,18 +634,23 @@ document.addEventListener('DOMContentLoaded', () => {
             showTemporaryMessage("Admin mode activated.");
             syncButton.classList.remove('hidden');
             adminClearButton.classList.remove('hidden');
+            hideAdminButton.classList.remove('hidden');
             appState.adminClickCount = 0;
         }
     });
 
     syncButton.addEventListener('click', syncData);
+
     adminClearButton.addEventListener('click', () => {
         if (confirm("Are you sure you want to clear all locally stored data? This cannot be undone.")) {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             showTemporaryMessage("Local data cleared.", "success");
             resetSurvey();
+            hideAdminControls();
         }
     });
+    
+    hideAdminButton.addEventListener('click', hideAdminControls);
     
     window.addEventListener('online', () => {
         showTemporaryMessage("You are back online. Attempting to sync.", "success");
@@ -631,5 +660,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     renderPage(appState.currentPage);
     handleUserActivity();
-    setInterval(syncData, 120 * 60 * 1000); // Attempt to sync every 5 minutes
+    setInterval(syncData, 60 * 60 * 1000); // Attempt to sync every hour
 });
