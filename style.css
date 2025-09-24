@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+    --sewa-orange: #ff6600;
+    --sewa-blue: #004d99;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.emoji-radio-group input:checked + label,
+.number-scale-group input:checked + label {
+    border-color: var(--sewa-orange);
+    background-color: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    color: var(--sewa-orange);
+}
+
+.emoji-radio-group label,
+.number-scale-group label,
+.location-radio-group label {
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+/* New a11y-friendly star rating CSS */
+.star-rating input {
+    display: none;
+}
+.star-rating input:checked ~ label,
+.star-rating input:checked ~ label:hover,
+.star-rating input:checked ~ label:hover ~ label {
+    color: #ffc107;
+}
+.star-rating input:not(:checked) ~ label:hover,
+.star-rating input:not(:checked) ~ label:hover ~ label {
+    color: #ffc107;
+}
+
+.location-radio-group input:checked + label {
+    background-color: var(--sewa-orange);
+    color: white;
+    border-color: var(--sewa-orange);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.hidden-fields {
+    opacity: 0;
+    height: 0;
+    pointer-events: none;
+    overflow: hidden;
+    transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
+}
+
+.visible-fields {
+    opacity: 1;
+    height: auto;
+    pointer-events: auto;
+}
+
+.loading-bar-container {
+    width: 100%;
+    background-color: #e2e8f0;
+    border-radius: 999px;
+    height: 12px;
+    overflow: hidden;
+}
+
+.loading-bar {
+    height: 100%;
+    background-color: var(--sewa-blue);
+    border-radius: 999px;
+    transition: width 0.3s ease-in-out;
+}
+
+.error-message {
+    color: #dc2626;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.has-error {
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
+}
+
+#overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease;
+    z-index: 50;
+}
+
+#overlay.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+#cancelButton {
+    background-color: #ef4444;
+    color: white;
+}
+
+#cancelButton:hover {
+    background-color: #dc2626;
+}
+
+.checkmark-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.checkmark-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: #22c55e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
+}
+
+.checkmark-icon {
+    color: white;
+    font-size: 4rem;
+    font-weight: bold;
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    width: 1.5rem;
+    height: 1.5rem;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
