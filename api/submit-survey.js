@@ -25,7 +25,6 @@ export default async function handler(request, response) {
   const sheets = google.sheets({ version: 'v4', auth });
 
   try {
-    // Extract all fields from the request body, including the new ones.
     const {
       id,
       timestamp,
@@ -37,52 +36,58 @@ export default async function handler(request, response) {
       age,
       name,
       email,
-      newsletterConsent
+      newsletterConsent,
     } = request.body;
     
-    // --- Server-Side Validation ---
-    // Validate required fields to prevent empty submissions
+    // --- Server-Side Validation (unchanged from your code) ---
     if (!comments || !satisfaction || !cleanliness || !staff_friendliness) {
       console.error('Validation Error: Missing required fields.');
       return response.status(400).json({ message: 'Missing required survey data.' });
     }
     
-    // Optional: Add specific validation for email format if provided
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       console.error('Validation Error: Invalid email format.');
       return response.status(400).json({ message: 'Invalid email format.' });
     }
     
-    // Optional: Add validation for specific field values (e.g., cleanliness scale)
     const cleanlinessRating = parseInt(cleanliness);
     if (isNaN(cleanlinessRating) || cleanlinessRating < 1 || cleanlinessRating > 5) {
       console.error('Validation Error: Invalid cleanliness rating.');
       return response.status(400).json({ message: 'Invalid cleanliness rating.' });
     }
 
-    // The range now includes all new columns. Ensure your Google Sheet's columns match this order.
-    // Example: A = Timestamp, B = ID, C = Comments, D = Satisfaction, E = Cleanliness, F = Staff Friendliness, etc.
-    const range = 'Sheet1!A:K';
-
-    const values = [
-      [
-        timestamp || new Date().toISOString(), // Use client-side timestamp, fall back to server timestamp
-        id,
-        comments,
-        satisfaction,
-        cleanliness,
-        staff_friendliness,
-        location,
-        age,
-        name,
-        email,
-        newsletterConsent,
-      ],
+    // --- Dynamic Data Mapping for Google Sheets ---
+    // Define the column order in your Google Sheet (A, B, C, etc.)
+    const columns = [
+      'timestamp',
+      'id',
+      'comments',
+      'satisfaction',
+      'cleanliness',
+      'staff_friendliness',
+      'location',
+      'age',
+      'name',
+      'email',
+      'newsletterConsent',
     ];
 
+    // Get the values from the request body in the correct order
+    const valuesToAppend = columns.map(columnName => {
+      // Use request.body to get the value for the corresponding column name
+      // This will correctly handle missing or null values
+      const value = request.body[columnName];
+      // Return the value, or an empty string for missing data to ensure the row stays aligned.
+      return value || '';
+    });
+
     const resource = {
-      values,
+      values: [valuesToAppend],
     };
+
+    // The range for the append operation. This will ensure data is added in the next available row from column A.
+    // The previous issue was likely caused by the data itself having empty cells, and the append method skipping over them.
+    const range = 'Sheet1!A:K';
 
     // Append the data to the Google Sheet.
     await sheets.spreadsheets.values.append({
