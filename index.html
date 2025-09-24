@@ -838,7 +838,7 @@
                 toggleUserInteraction(false, "Submitting data...");
                 log("Submitting form data:", appState.formData);
 
-                const response = await fetch('/api/submit', {
+                const response = await fetch('/api/submit-survey', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(appState.formData),
