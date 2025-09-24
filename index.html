@@ -735,7 +735,6 @@
                     toggleUI(true);
                 } else {
                     await submitSurveyAndHandleCompletion();
-                    toggleUI(true);
                 }
             }
         };
@@ -1002,6 +1001,7 @@
             if (appState.currentPage > 0) {
                 appState.currentPage--;
                 renderPage(appState.currentPage);
+                toggleUI(true);
             }
         });
 
