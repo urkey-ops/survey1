@@ -298,13 +298,14 @@
             {
                 id: 'contact',
                 name: 'contact',
-                type: 'checkbox-with-fields',
-                question: 'Would you like to stay connected?',
+                type: 'custom-contact',
+                question: 'Help us stay in touch.',
+                required: true,
                 fields: [
                     { id: 'name', name: 'name', label: 'Name', type: 'text', placeholder: 'Enter your name' },
+                    { id: 'newsletterConsent', name: 'newsletterConsent', label: 'Yes, I want to subscribe to updates', type: 'checkbox', placeholder: '' },
                     { id: 'email', name: 'email', label: 'Email', type: 'email', placeholder: 'Enter your email' }
-                ],
-                required: false
+                ]
             }
         ];
 
@@ -475,557 +476,419 @@
                         html += `
                             <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked} aria-label="${option.label} emoji">
                             <label for="${questionData.id + option.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                                <span class="text-4xl sm:text-5xl">${option.emoji}</span>
-                                <span class="mt-2 text-gray-500 text-xs sm:text-sm">${option.label}</span>
+                                <span class="text-4xl sm:text-5xl mb-2">${option.emoji}</span>
+                                <span class="text-sm font-medium text-gray-600">${option.label}</span>
                             </label>
                         `;
                     });
-                    html += `</div>`;
-                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
+                    html += `</div><span id="${questionData.id}Error" class="error-message hidden mt-2 block"></span>`;
                     break;
                 case 'number-scale':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `
-                        <div id="${questionData.id}Group" class="number-scale-group flex justify-between items-center bg-gray-50 rounded-lg p-4" role="radiogroup" aria-labelledby="${questionData.id}Label">
-                            <span class="text-xs text-gray-500">${questionData.labels.min}</span>
-                            <div class="flex space-x-2">
-                    `;
+                    html += `<div class="number-scale-group flex justify-between items-center space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     for (let i = questionData.min; i <= questionData.max; i++) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="visually-hidden" ${checked} aria-label="${i}">
-                            <label for="${questionData.id + i}" class="w-10 h-10 flex items-center justify-center text-sm font-medium bg-white rounded-full border border-gray-300 hover:bg-gray-100 transition-colors duration-200 cursor-pointer">${i}</label>
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="visually-hidden" ${checked} aria-label="Rating of ${i}">
+                            <label for="${questionData.id + i}" class="flex flex-col items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-white border-2 border-transparent rounded-full font-bold text-gray-700 hover:bg-gray-50 transition-colors duration-300 cursor-pointer">
+                                <span>${i}</span>
+                            </label>
                         `;
                     }
-                    html += `
-                            </div>
-                            <span class="text-xs text-gray-500">${questionData.labels.max}</span>
-                        </div>
-                    `;
-                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
+                    html += `</div>
+                             <div class="flex justify-between text-sm mt-2 text-gray-500">
+                                 <span>${questionData.labels.min}</span>
+                                 <span>${questionData.labels.max}</span>
+                             </div>
+                             <span id="${questionData.id}Error" class="error-message hidden mt-2 block"></span>
+                            `;
                     break;
                 case 'star-rating':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `<div id="${questionData.id}Group" class="star-rating flex flex-row-reverse justify-end space-x-1 sm:space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    html += `<div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     for (let i = questionData.max; i >= questionData.min; i--) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
                             <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" ${checked} aria-label="${i} stars">
-                            <label for="${questionData.id + i}" class="star">
-                                <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current" viewBox="0 0 24 24"><path d="M12 17.27l6.18 3.73-1.64-7.03 5.46-4.73-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73-1.64 7.03z"/></svg>
-                            </label>
+                            <label for="${questionData.id + i}" class="star text-4xl sm:text-5xl pr-1">★</label>
                         `;
                     }
-                    html += `</div>`;
-                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
+                    html += `</div><span id="${questionData.id}Error" class="error-message hidden mt-2 block"></span>`;
                     break;
                 case 'radio-with-other':
-                case 'radio':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `<div class="location-radio-group grid grid-cols-1 sm:grid-cols-2 gap-4" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    html += `<div class="location-radio-group grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     questionData.options.forEach(option => {
                         const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
                         html += `
-                            <div>
-                                <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked} aria-label="${option.label}">
-                                <label for="${questionData.id + option.value}" class="block w-full py-4 px-6 bg-white border border-gray-300 rounded-lg text-center font-medium cursor-pointer hover:bg-gray-50 transition-colors duration-200">
-                                    ${option.label}
-                                </label>
-                            </div>
+                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked}>
+                            <label for="${questionData.id + option.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg cursor-pointer transition-colors duration-200">${option.label}</label>
                         `;
                     });
-                    html += `</div>`;
-                    if (questionData.type === 'radio-with-other' && appState.formData[questionData.name] === 'Other') {
-                        const otherValue = appState.formData['otherLocation'] || '';
-                        html += `<div class="mt-4"><input type="text" id="otherLocation" name="otherLocation" placeholder="Please specify" value="${otherValue}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"></div>`;
-                        html += `<span id="otherLocationError" class="error-message hidden"></span>`;
-                    }
-                    html += `<span id="${questionData.id}Error" class="error-message hidden text-center mt-2"></span>`;
+                    html += `</div>
+                            <div id="other-location-container" class="mt-4 ${appState.formData[questionData.name] === 'Other' ? '' : 'hidden'}">
+                                <input type="text" id="other_location_text" name="other_location" class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="Please specify your location" value="${appState.formData['other_location'] || ''}">
+                                <span id="other_location_textError" class="error-message hidden mt-1"></span>
+                            </div>
+                            <span id="${questionData.id}Error" class="error-message hidden mt-2 block"></span>`;
                     break;
-                case 'checkbox-with-fields':
-                    const isChecked = appState.formData.newsletterConsent === 'Yes';
-                    const hiddenClass = isChecked ? 'visible-fields' : 'hidden-fields';
-                    html = `
-                        <p class="text-sm text-gray-500 mb-4">You can optionally provide your contact information to receive updates and news.</p>
-                        <div class="flex items-center">
-                            <input id="newsletterConsent" name="newsletterConsent" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${isChecked ? 'checked' : ''}>
-                            <label for="newsletterConsent" class="ml-2 block text-sm text-gray-900">
-                                Yes, I would like to subscribe to the newsletter.
-                            </label>
-                        </div>
-                        <div id="contactFields" class="${hiddenClass}">
-                    `;
-                    questionData.fields.forEach(field => {
-                        const value = appState.formData[field.name] || '';
+                case 'radio':
+                    html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
+                    html += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    questionData.options.forEach(option => {
+                        const checked = appState.formData[questionData.name] === option.value ? 'checked' : '';
                         html += `
-                            <div class="mt-4">
-                                <label for="${field.id}" class="block text-sm font-medium text-gray-700">${field.label}</label>
-                                <input type="${field.type}" id="${field.id}" name="${field.name}" placeholder="${field.placeholder}" value="${value}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
-                                <span id="${field.id}Error" class="error-message hidden"></span>
-                            </div>
+                            <input type="radio" id="${questionData.id + option.value}" name="${questionData.name}" value="${option.value}" class="visually-hidden" ${checked}>
+                            <label for="${questionData.id + option.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg cursor-pointer transition-colors duration-200">${option.label}</label>
                         `;
                     });
-                    html += `</div>`;
+                    html += `</div><span id="${questionData.id}Error" class="error-message hidden mt-2 block"></span>`;
+                    break;
+                case 'custom-contact':
+                    const nameValue = appState.formData['name'] || '';
+                    const newsletterConsentChecked = appState.formData['newsletterConsent'] === 'Yes' ? 'checked' : '';
+                    const emailValue = appState.formData['email'] || '';
+                    const emailFieldVisibleClass = newsletterConsentChecked ? 'visible-fields' : 'hidden-fields';
+                    
+                    html = `
+                        <div class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-gray-700 font-semibold mb-2">Name</label>
+                                <input type="text" id="name" name="name" class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="Enter your name" value="${nameValue}" required>
+                                <span id="nameError" class="error-message hidden"></span>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="newsletterConsent" name="newsletterConsent" value="Yes" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${newsletterConsentChecked}>
+                                <label for="newsletterConsent" class="ml-2 block text-gray-700">Yes, I want to subscribe to updates</label>
+                            </div>
+                            <div id="email-field-container" class="${emailFieldVisibleClass}">
+                                <label for="email" class="block text-gray-700 font-semibold mb-2">Email</label>
+                                <input type="email" id="email" name="email" class="shadow-sm appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="Enter your email" value="${emailValue}">
+                                <span id="emailError" class="error-message hidden"></span>
+                            </div>
+                        </div>
+                    `;
                     break;
             }
+
             questionContainer.innerHTML = html;
+            updateProgressBar();
 
-            if (questionData.type === 'checkbox-with-fields') {
-                document.getElementById('newsletterConsent').addEventListener('change', (e) => {
-                    const contactFields = document.getElementById('contactFields');
-                    if (e.target.checked) {
-                        contactFields.classList.remove('hidden-fields');
-                        contactFields.classList.add('visible-fields');
-                    } else {
-                        contactFields.classList.remove('visible-fields');
-                        contactFields.classList.add('hidden-fields');
-                    }
-                });
-            }
-            
-            handleUserActivity();
-
-            backButton.style.visibility = appState.currentPage === 0 ? 'hidden' : 'visible';
-            nextButton.textContent = (appState.currentPage === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-
-            if (appState.currentPage === 0) {
-                startQuestionRotation();
+            if (pageIndex === 0) {
+                if (!appState.isUserActive) {
+                    startQuestionRotation();
+                }
             } else {
                 stopQuestionRotation();
             }
-            updateProgressBar();
-        };
 
-        const saveCurrentPageData = () => {
-            const formData = new FormData(form);
-            const questionData = surveyQuestions[appState.currentPage];
-            
-            if (questionData.type === 'checkbox-with-fields') {
-                appState.formData.newsletterConsent = formData.get('newsletterConsent') === 'on' ? 'Yes' : 'No';
-                appState.formData.name = formData.get('name') || '';
-                appState.formData.email = formData.get('email') || '';
-            } else if (questionData.type === 'radio-with-other') {
-                const selectedOption = formData.get(questionData.name);
-                appState.formData[questionData.name] = selectedOption;
-                if (selectedOption === 'Other') {
-                    appState.formData['otherLocation'] = formData.get('otherLocation') || '';
-                } else {
-                    delete appState.formData['otherLocation'];
-                }
+            if (pageIndex === surveyQuestions.length - 1) {
+                nextButton.textContent = 'Submit Survey';
             } else {
-                appState.formData[questionData.name] = formData.get(questionData.name);
+                nextButton.textContent = 'Next';
             }
+
+            backButton.style.visibility = pageIndex === 0 ? 'hidden' : 'visible';
+            setupEventListeners();
         };
 
-        const validateCurrentPage = () => {
+        const validatePage = () => {
             const questionData = surveyQuestions[appState.currentPage];
-            
-            const prevErrorElement = document.getElementById(`${questionData.id}Error`);
-            if (prevErrorElement) {
-                prevErrorElement.classList.add('hidden');
-                const questionGroup = document.getElementById(`${questionData.id}Group`);
-                if (questionGroup) {
-                    questionGroup.classList.remove('border-2', 'border-red-500');
-                }
-            }
-            if (questionData.type === 'checkbox-with-fields') {
-                document.getElementById('name').classList.remove('has-error');
-                document.getElementById('email').classList.remove('has-error');
-                document.getElementById('nameError').classList.add('hidden');
-                document.getElementById('emailError').classList.add('hidden');
-            }
-            if (questionData.type === 'radio-with-other') {
-                const otherLocationInput = document.getElementById('otherLocation');
-                if (otherLocationInput) {
-                    otherLocationInput.classList.remove('has-error');
-                    document.getElementById('otherLocationError').classList.add('hidden');
-                }
-            }
-
             let isValid = true;
-            let errorMessage = '';
-
-            if (questionData.type === 'checkbox-with-fields') {
-                if (appState.formData.newsletterConsent === 'Yes') {
-                    const nameInput = document.getElementById('name');
-                    const emailInput = document.getElementById('email');
-                    const emailRegex = /^\S+@\S+\.\S+$/;
-
-                    if (!nameInput.value.trim()) {
-                        isValid = false;
-                        document.getElementById('nameError').textContent = 'Name is required.';
-                        document.getElementById('nameError').classList.remove('hidden');
-                        nameInput.classList.add('has-error');
-                    }
-                    if (!emailInput.value.trim() || !emailRegex.test(emailInput.value)) {
-                        isValid = false;
-                        document.getElementById('emailError').textContent = 'A valid email is required.';
-                        document.getElementById('emailError').classList.remove('hidden');
-                        emailInput.classList.add('has-error');
+            
+            // Clear previous errors
+            const errorSpans = questionContainer.querySelectorAll('.error-message');
+            errorSpans.forEach(span => {
+                span.classList.add('hidden');
+                span.previousElementSibling.classList.remove('has-error');
+            });
+            
+            const showValidationError = (fieldId, message) => {
+                const errorSpan = document.getElementById(`${fieldId}Error`);
+                if (errorSpan) {
+                    errorSpan.textContent = message;
+                    errorSpan.classList.remove('hidden');
+                    const fieldInput = document.getElementById(fieldId);
+                    if (fieldInput) {
+                        fieldInput.classList.add('has-error');
                     }
                 }
-            } else if (questionData.required) {
-                let value = appState.formData[questionData.name];
+                isValid = false;
+            };
+
+            const currentPageData = {};
+            const inputs = questionContainer.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                if (input.type === 'radio' && input.checked) {
+                    currentPageData[input.name] = input.value;
+                } else if (input.type === 'checkbox') {
+                    currentPageData[input.name] = input.checked ? 'Yes' : 'No';
+                } else if (input.type !== 'radio') {
+                    currentPageData[input.name] = input.value;
+                }
+            });
+
+            // Specific validation based on question type
+            if (questionData.type === 'textarea') {
+                const value = currentPageData[questionData.name]?.trim();
+                if (questionData.required && (!value || value.length === 0)) {
+                    showValidationError(questionData.id, 'This field is required.');
+                }
+            } else if (questionData.type === 'emoji-radio' || questionData.type === 'number-scale' || questionData.type === 'radio' || questionData.type === 'star-rating') {
+                if (questionData.required && !currentPageData[questionData.name]) {
+                    showValidationError(questionData.id, 'Please make a selection.');
+                }
+            } else if (questionData.type === 'radio-with-other') {
+                const selectedValue = currentPageData[questionData.name];
+                const otherLocationValue = currentPageData['other_location']?.trim();
+
+                if (selectedValue === 'Other' && (!otherLocationValue || otherLocationValue.length === 0)) {
+                    showValidationError('other_location_text', 'Please specify your location.');
+                }
+            } else if (questionData.type === 'custom-contact') {
+                const nameValue = currentPageData['name']?.trim();
+                const newsletterConsent = currentPageData['newsletterConsent'] === 'Yes';
+                const emailValue = currentPageData['email']?.trim();
                 
-                if (questionData.type === 'radio-with-other') {
-                    if (value === 'Other') {
-                        value = appState.formData['otherLocation'];
-                        const otherLocationInput = document.getElementById('otherLocation');
-                        if (!value || value.trim() === '') {
-                            isValid = false;
-                            document.getElementById('otherLocationError').textContent = 'Please specify where you are from.';
-                            document.getElementById('otherLocationError').classList.remove('hidden');
-                            otherLocationInput.classList.add('has-error');
-                        }
-                    } else if (!value) {
-                         isValid = false;
-                    }
-                } else if (questionData.type === 'textarea') {
-                    isValid = value && value.trim() !== '';
-                } else {
-                    isValid = !!value;
+                if (!nameValue || nameValue.length === 0) {
+                    showValidationError('name', 'Name is required.');
                 }
-
-                if (!isValid) {
-                    errorMessage = questionData.type === 'textarea' ? 'Please answer this question to continue.' : 'Please select an option to continue.';
-                    const errorElement = document.getElementById(`${questionData.id}Error`);
-                    if (errorElement) {
-                        errorElement.textContent = errorMessage;
-                        errorElement.classList.remove('hidden');
-                    }
-
-                    const questionGroup = document.getElementById(`${questionData.id}Group`);
-                    if (questionGroup) {
-                        questionGroup.classList.add('border-2', 'border-red-500');
-                    }
+                
+                if (newsletterConsent && (!emailValue || emailValue.length === 0)) {
+                    showValidationError('email', 'Email is required for subscription.');
+                } else if (emailValue && !/^\S+@\S+\.\S+$/.test(emailValue)) {
+                    showValidationError('email', 'Please enter a valid email address.');
                 }
+            }
+            
+            if (isValid) {
+                // Save data to state
+                Object.assign(appState.formData, currentPageData);
+                log("Current form data:", appState.formData);
             }
             
             return isValid;
         };
 
-        // NEW: Inactivity & Auto-Submit Logic
-        const toggleUserInteraction = (enable) => {
-            const interactiveElements = form.querySelectorAll('input, button, textarea, label');
-            interactiveElements.forEach(el => {
-                if (enable) {
-                    el.removeAttribute('disabled');
-                    el.style.pointerEvents = 'auto';
-                } else {
-                    el.setAttribute('disabled', 'true');
-                    el.style.pointerEvents = 'none';
-                }
-            });
-
-            if (enable) {
-                overlay.classList.remove('visible');
-                overlay.style.display = 'none';
+        const toggleEmailFieldVisibility = (isVisible) => {
+            const emailContainer = document.getElementById('email-field-container');
+            const emailInput = document.getElementById('email');
+            
+            if (isVisible) {
+                emailContainer.classList.remove('hidden-fields');
+                emailContainer.classList.add('visible-fields');
+                emailInput.setAttribute('required', 'true');
             } else {
-                overlay.style.display = 'flex';
-                setTimeout(() => overlay.classList.add('visible'), 10);
+                emailContainer.classList.remove('visible-fields');
+                emailContainer.classList.add('hidden-fields');
+                emailInput.removeAttribute('required');
+                emailInput.value = ''; // Clear the email value if the field is hidden
+            }
+        };
+
+        const setupEventListeners = () => {
+            const questionData = surveyQuestions[appState.currentPage];
+            
+            if (questionData.type === 'textarea') {
+                const textarea = document.getElementById('comments');
+                if (textarea) {
+                    textarea.addEventListener('focus', stopQuestionRotation);
+                    textarea.addEventListener('blur', startQuestionRotation);
+                }
+            } else if (questionData.type === 'radio-with-other') {
+                const otherRadio = document.getElementById('locationOther');
+                const otherLocationContainer = document.getElementById('other-location-container');
+                if (otherRadio) {
+                    otherRadio.addEventListener('change', () => {
+                        if (otherRadio.checked) {
+                            otherLocationContainer.classList.remove('hidden');
+                        } else {
+                            otherLocationContainer.classList.add('hidden');
+                        }
+                    });
+                    
+                    const otherInput = document.getElementById('other_location_text');
+                    otherInput.addEventListener('input', handleUserActivity);
+                }
+                // Handle initial state if "Other" was previously selected
+                if (appState.formData['location'] === 'Other') {
+                    otherLocationContainer.classList.remove('hidden');
+                } else {
+                    otherLocationContainer.classList.add('hidden');
+                }
+            } else if (questionData.type === 'custom-contact') {
+                const newsletterCheckbox = document.getElementById('newsletterConsent');
+                if (newsletterCheckbox) {
+                    newsletterCheckbox.addEventListener('change', (e) => {
+                        toggleEmailFieldVisibility(e.target.checked);
+                    });
+                }
+            }
+            
+            // Reattach activity listeners for all inputs on the page
+            const inputs = questionContainer.querySelectorAll('input, textarea');
+            inputs.forEach(input => {
+                input.addEventListener('input', debouncedHandleActivity);
+                input.addEventListener('change', debouncedHandleActivity);
+            });
+            
+            // Handle form input on-screen
+            form.addEventListener('keydown', debouncedHandleActivity);
+            form.addEventListener('click', debouncedHandleActivity);
+            
+            // Make sure the email field visibility is correct on page load
+            const newsletterConsentCheckbox = document.getElementById('newsletterConsent');
+            if (newsletterConsentCheckbox) {
+                toggleEmailFieldVisibility(newsletterConsentCheckbox.checked);
             }
         };
 
         const autoSubmitSurvey = () => {
-            const hasPartialData = Object.keys(appState.formData).length > 0;
-            if (hasPartialData) {
-                log("User inactive. Initiating auto-submit countdown.");
-                toggleUserInteraction(false); 
-
-                let countdown = config.autoSubmitCountdown;
-                overlayMessage.textContent = `Auto-submitting in ${countdown}. Interact or press Cancel to stop.`;
-                cancelButton.classList.remove('hidden');
-
-                appState.countdownInterval = setInterval(() => {
-                    countdown--;
-                    overlayMessage.textContent = `Auto-submitting in ${countdown}. Interact or press Cancel to stop.`;
-                    
-                    if (countdown <= 0) {
-                        clearInterval(appState.countdownInterval);
-                        log("Countdown finished. Auto-submitting partial survey.");
-                        const finalData = { 
-                            ...appState.formData, 
-                            id: uuidv4(), 
-                            timestamp: new Date().toISOString(),
-                            isPartial: true
-                        };
-                        saveSurveyToQueue(finalData);
-                        resetSurveyAndUI();
-                    }
-                }, 1000);
-            } else {
-                log("No data to submit. Resetting survey to start page.");
-                resetSurveyAndUI();
+            if (appState.currentPage === 0 && Object.keys(appState.formData).length === 0) {
+                log("User inactive on first page with no data. Resetting survey.");
+                resetSurvey();
+                return;
             }
+
+            log("Starting auto-submit countdown.");
+            
+            let countdown = config.autoSubmitCountdown;
+            toggleUserInteraction(false, `Auto-submitting in ${countdown} seconds...`);
+            overlay.classList.add('visible');
+            cancelButton.classList.remove('hidden');
+
+            cancelButton.addEventListener('click', cancelAutoSubmit, { once: true });
+
+            appState.countdownInterval = setInterval(() => {
+                countdown--;
+                overlayMessage.textContent = `Auto-submitting in ${countdown} seconds...`;
+                if (countdown <= 0) {
+                    clearInterval(appState.countdownInterval);
+                    toggleUserInteraction(false, "Submitting...");
+                    submitSurvey();
+                }
+            }, 1000);
         };
         
-        const resetSurveyAndUI = () => {
-            clearTimeout(appState.inactivityTimeout);
-            clearInterval(appState.countdownInterval);
-            form.reset();
+        const submitSurvey = async () => {
+            try {
+                toggleUserInteraction(false, "Submitting data...");
+                log("Submitting form data:", appState.formData);
+
+                const response = await fetch('/api/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(appState.formData),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok.');
+                }
+
+                const result = await response.json();
+                log('API Response:', result);
+
+                showCompletionScreen();
+                
+            } catch (error) {
+                console.error('Submission failed:', error);
+                showTemporaryMessage('Submission failed. Please try again or inform staff.', 'error');
+                toggleUserInteraction(true);
+            }
+        };
+
+        const showCompletionScreen = () => {
+            surveyContent.innerHTML = `
+                <div class="checkmark-container min-h-[300px]">
+                    <div class="checkmark-circle">
+                        <div class="checkmark-icon">✓</div>
+                    </div>
+                    <h2 class="text-2xl font-bold text-gray-800 mt-6">Thank You!</h2>
+                    <p class="text-gray-600 mt-2">Your feedback has been submitted successfully.</p>
+                </div>
+            `;
+            // Reset after a delay
+            setTimeout(() => {
+                resetSurvey();
+            }, config.resetTime);
+        };
+
+        const resetSurvey = () => {
+            log("Resetting survey.");
             appState.currentPage = 0;
             appState.formData = {};
             appState.isUserActive = false;
             appState.stopRotationPermanently = false;
+            overlay.classList.remove('visible');
+            overlayMessage.textContent = "Survey auto-submitting due to inactivity...";
+            cancelButton.classList.add('hidden');
+            form.reset();
             renderPage(appState.currentPage);
+            
+            // Re-enable user interaction
             toggleUserInteraction(true);
-        };
-        
-        // --- Offline-first and Sync Logic ---
-        const getSurveyQueue = () => {
-            try {
-                const queue = JSON.parse(localStorage.getItem('surveyQueue'));
-                return Array.isArray(queue) ? queue.filter(item => !item.isScheduledForRetry) : [];
-            } catch (e) {
-                console.error("Failed to parse survey queue from localStorage.", e);
-                return [];
-            }
-        };
-        
-        const saveSurveyToQueue = (data) => {
-            log("Saving new survey to local queue.", data);
-            const queue = getSurveyQueue();
-            queue.push({ ...data, retries: 0 });
-            localStorage.setItem('surveyQueue', JSON.stringify(queue));
-            updateSyncButtonVisibility();
+            // Restart the inactivity timer on fresh load
+            handleUserActivity();
         };
 
-        const syncData = async () => {
-            const queue = getSurveyQueue();
-            if (queue.length === 0 || !navigator.onLine) {
-                log("Sync not needed or offline.");
-                updateSyncButtonVisibility();
-                return;
-            }
-            log(`Starting sync process for ${queue.length} items.`);
-            syncButton.textContent = 'Syncing...';
-            syncButton.classList.add('sync-loading');
-            
-            const pendingQueue = getSurveyQueue();
-            const successfullySynced = [];
-            const failedToSync = [];
-            
-            for (const surveyData of pendingQueue) {
-                try {
-                    const response = await fetch('/api/submit-survey', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(surveyData)
-                    });
-                    if (response.ok) {
-                        successfullySynced.push(surveyData);
-                        log(`Successfully synced item: ${surveyData.id}`);
-                    } else {
-                        throw new Error(`API error: ${response.status}`);
-                    }
-                } catch (error) {
-                    log(`Sync failed for item ${surveyData.id}:`, error);
-                    failedToSync.push(surveyData);
+        const toggleUserInteraction = (enable, message = "") => {
+            if (enable) {
+                surveyContent.classList.remove('pointer-events-none', 'opacity-50');
+                overlay.classList.remove('visible');
+            } else {
+                surveyContent.classList.add('pointer-events-none', 'opacity-50');
+                if (message) {
+                    overlayMessage.textContent = message;
+                    overlay.classList.add('visible');
                 }
             }
+        };
 
-            let finalQueue = failedToSync.map(item => {
-                item.retries++;
-                if (item.retries >= config.maxRetries) {
-                    log(`Max retries reached for ${item.id}. Dropping.`);
-                    return null;
+        // --- Event Handlers ---
+        nextButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (validatePage()) {
+                if (appState.currentPage < surveyQuestions.length - 1) {
+                    appState.currentPage++;
+                    renderPage(appState.currentPage);
+                } else {
+                    submitSurvey();
                 }
-                const delay = config.baseDelay * Math.pow(2, item.retries);
-                log(`Scheduling retry for ${item.id} in ${delay / 1000} seconds.`);
-                setTimeout(syncData, delay);
-                item.isScheduledForRetry = true;
-                return item;
-            }).filter(Boolean);
-
-            localStorage.setItem('surveyQueue', JSON.stringify(finalQueue));
-            syncButton.classList.remove('sync-loading');
-            updateSyncButtonVisibility(failedToSync.length > 0);
-
-            if (finalQueue.length === 0) {
-                showTemporaryMessage('Sync successful! All data uploaded.');
-            } else if (successfullySynced.length > 0) {
-                showTemporaryMessage(`Synced ${successfullySynced.length} of ${queue.length} surveys. Some will be retried later.`);
-            } else {
-                showTemporaryMessage('Sync failed. Please check your internet connection.', 'error');
-            }
-        };
-
-        const updateSyncButtonVisibility = (hasFailed = false) => {
-            const queue = getSurveyQueue();
-            if (queue.length > 0 && navigator.onLine) {
-                syncButton.classList.remove('hidden');
-                syncButton.textContent = `Sync Data (${queue.length})`;
-                if (hasFailed) {
-                    syncButton.textContent += ' (⚠️)';
-                }
-            } else {
-                syncButton.classList.add('hidden');
-            }
-        };
-        
-        const clearQueue = () => {
-            const queue = getSurveyQueue();
-            if (queue.length > 0) {
-                if (confirm(`Are you sure you want to clear ${queue.length} unsynced submissions? This action cannot be undone.`)) {
-                    log("Admin confirmed clear queue. Removing data.");
-                    localStorage.removeItem('surveyQueue');
-                    updateSyncButtonVisibility();
-                    showTemporaryMessage('Unsynced data cleared.');
-                }
-            } else {
-                log("No unsynced data to clear.");
-                showTemporaryMessage('No unsynced data to clear.');
-            }
-        };
-
-        const scheduleDailySync = () => {
-            const now = new Date();
-            const syncTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 19, 0, 0);
-            if (now > syncTime) {
-                syncTime.setDate(syncTime.getDate() + 1);
-            }
-            const delay = syncTime.getTime() - now.getTime();
-            log(`Scheduled next sync for ${syncTime.toLocaleString()}. Delay: ${delay / 1000} seconds.`);
-            setTimeout(syncData, delay);
-        };
-
-        // --- Event Listeners & Initialization ---
-        nextButton.addEventListener('click', () => {
-            // Explicitly cancel any timers to prevent race conditions
-            clearTimeout(appState.inactivityTimeout);
-            clearInterval(appState.countdownInterval);
-            
-            saveCurrentPageData();
-            if (!validateCurrentPage()) {
-                return;
-            }
-
-            if (appState.currentPage === surveyQuestions.length - 1) {
-                form.dispatchEvent(new Event('submit', { cancelable: true }));
-            } else {
-                appState.currentPage++;
-                renderPage(appState.currentPage);
             }
         });
 
-        backButton.addEventListener('click', () => {
+        backButton.addEventListener('click', (e) => {
+            e.preventDefault();
             if (appState.currentPage > 0) {
-                // Explicitly cancel any timers
-                clearTimeout(appState.inactivityTimeout);
-                clearInterval(appState.countdownInterval);
                 appState.currentPage--;
-                statusMessage.style.display = 'none';
                 renderPage(appState.currentPage);
             }
         });
-
-        syncButton.addEventListener('click', syncData);
-        cancelButton.addEventListener('click', cancelAutoSubmit);
 
         mainTitle.addEventListener('click', () => {
             appState.adminClickCount++;
-            if (appState.adminClickCount === 1) {
-                appState.adminTimer = setTimeout(() => {
-                    appState.adminClickCount = 0;
-                }, config.adminClickTimeout);
-            } else if (appState.adminClickCount >= config.adminClicksRequired) {
+            if (appState.adminTimer) {
                 clearTimeout(appState.adminTimer);
+            }
+            appState.adminTimer = setTimeout(() => {
                 appState.adminClickCount = 0;
-                adminClearButton.classList.toggle('hidden');
-                showTemporaryMessage('Admin button toggled.');
-            }
-        });
+            }, config.adminClickTimeout);
 
-        adminClearButton.addEventListener('click', clearQueue);
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            // Clear the timers explicitly on submission
-            clearTimeout(appState.inactivityTimeout);
-            clearInterval(appState.countdownInterval);
-            
-            const finalData = { ...appState.formData, id: uuidv4(), timestamp: new Date().toISOString() };
-            log("Form submitted. Saving to queue.", finalData);
-            saveSurveyToQueue(finalData);
-            
-            surveyContent.style.display = 'none';
-            statusMessage.style.display = 'block';
-            statusMessage.innerHTML = `
-                <div class="checkmark-container">
-                    <div class="checkmark-circle">
-                        <span class="checkmark-icon">&#10003;</span>
-                    </div>
-                    <h2 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-6">Thank you!</h2>
-                    <p class="text-gray-500 mt-2">Your feedback has been submitted.</p>
-                </div>
-            `;
-            
-            const rotatingQuestion = surveyQuestions[0].rotatingText[appState.questionRotationIndex];
-            const resetDelay = appState.isTyping ? (config.rotationSpeed * rotatingQuestion.length) + 1000 : config.resetTime;
-
-            setTimeout(() => {
-                statusMessage.style.display = 'none';
-                surveyContent.style.display = 'block';
-                resetSurveyAndUI();
-            }, resetDelay);
-        });
-
-        form.addEventListener('change', (e) => {
-            const questionData = surveyQuestions[appState.currentPage];
-            const name = e.target.name;
-            const value = e.target.value;
-            
-            const errorElement = document.getElementById(`${e.target.id}Error`) || document.getElementById(`${questionData.id}Error`);
-            if (errorElement) {
-                errorElement.classList.add('hidden');
-                const questionGroup = document.getElementById(`${questionData.id}Group`);
-                if (questionGroup) {
-                    questionGroup.classList.remove('border-2', 'border-red-500');
-                }
-            }
-            if (e.target.id) {
-                const element = document.getElementById(e.target.id);
-                if (element) {
-                    element.classList.remove('has-error');
-                }
-            }
-
-
-            if (questionData.type === 'checkbox-with-fields') {
-                saveCurrentPageData();
-            } else if (questionData.type === 'radio-with-other') {
-                saveCurrentPageData();
-                renderPage(appState.currentPage);
-            } else {
-                appState.formData[name] = value;
-            }
-
-            if (e.target.type === 'radio' && questionData.type !== 'radio-with-other') {
-                saveCurrentPageData();
-                if(validateCurrentPage()){
-                    nextButton.click();
-                }
+            if (appState.adminClickCount === config.adminClicksRequired) {
+                log("Admin mode activated!");
+                showTemporaryMessage("Admin mode activated.");
+                syncButton.classList.remove('hidden');
+                adminClearButton.classList.remove('hidden');
+                appState.adminClickCount = 0;
+                clearTimeout(appState.adminTimer);
             }
         });
         
-        document.addEventListener('keydown', (e) => {
-            const commentsTextarea = document.getElementById('comments');
-            if (commentsTextarea && document.activeElement === commentsTextarea) {
-                debouncedHandleActivity();
-            }
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            renderPage(appState.currentPage);
+            handleUserActivity(); // Start the inactivity timer on initial page load
         });
-
-        document.addEventListener('mousemove', debouncedHandleActivity);
-        document.addEventListener('mousedown', debouncedHandleActivity);
-        document.addEventListener('touchstart', debouncedHandleActivity);
-
-        window.addEventListener('online', syncData);
-        window.addEventListener('offline', updateSyncButtonVisibility);
-
-        renderPage(appState.currentPage);
-        updateSyncButtonVisibility();
-        scheduleDailySync();
     </script>
 </body>
 </html>
