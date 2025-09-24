@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         autoSubmitCountdown: 5,
         debounceDelay: 200,
     };
-    
+
     const API_ENDPOINT = '/api/submit-survey';
     const LOCAL_STORAGE_KEY = 'surveySubmissions';
 
@@ -169,13 +169,14 @@ document.addEventListener('DOMContentLoaded', () => {
             statusMessage.style.display = 'none';
         }, 5000);
     };
-    
+
     // --- Inactivity and User Activity ---
     const handleUserActivity = () => {
         clearTimeout(appState.inactivityTimeout);
+        log("User activity detected. isUserActive set to TRUE.");
         appState.isUserActive = true;
         appState.stopRotationPermanently = true;
-        
+
         // Clear the countdown overlay and timer on activity
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
@@ -184,12 +185,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         appState.inactivityTimeout = setTimeout(() => {
-            if (appState.currentPage === 0 && Object.keys(appState.formData).length === 0) {
+            log("Inactivity timer expired. isUserActive:", appState.isUserActive);
+            // CRITICAL FIX: The auto-submit logic should check the formData length, not the isUserActive flag here.
+            if (Object.keys(appState.formData).length > 0) {
+                log("User inactive with partial data. Triggering auto-submit.");
+                autoSubmitSurvey();
+            } else {
                 log("User inactive on first page with no data. Resetting survey.");
                 resetSurvey();
-            } else {
-                log("User inactive. Triggering auto-submit.");
-                autoSubmitSurvey();
             }
         }, config.inactivityTime);
     };
@@ -206,7 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(appState.typingTimeout);
         clearTimeout(appState.displayTimeout);
     };
-    
+
     const typeWriter = (text, i) => {
         const questionElement = questionContainer.querySelector('#rotatingQuestion');
         if (!questionElement) return;
@@ -233,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
         typeWriter(currentQuestion, 0);
     };
-    
+
     // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
         'textarea': {
@@ -390,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
-        
+
         // General and specific event listeners
         const allInputs = questionContainer.querySelectorAll('input, textarea');
         allInputs.forEach(input => {
@@ -436,12 +439,12 @@ document.addEventListener('DOMContentLoaded', () => {
             fieldInput.classList.add('has-error');
         }
     };
-    
+
     const validatePage = () => {
         clearValidationErrors();
         const questionData = surveyQuestions[appState.currentPage];
         let isValid = true;
-        
+
         // Update formData from the current page's form elements
         const currentData = Object.fromEntries(new FormData(form));
         Object.assign(appState.formData, currentData);
@@ -451,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isValid = false;
             showValidationError(questionData.id, "This field is required.");
         }
-        
+
         if (questionData.type === 'radio-with-other' && appState.formData.location === 'Other' && !appState.formData.other_location?.trim()) {
             isValid = false;
             showValidationError('other_location_text', "Please specify your location.");
@@ -465,14 +468,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 showValidationError('email', "Please enter a valid email address.");
             }
         }
-        
+
         return isValid;
     };
 
     // --- Navigation and Submission ---
     const handleNextQuestion = async () => {
         if (!validatePage()) return;
-        
+
         toggleUI(false);
         if (appState.currentPage < surveyQuestions.length - 1) {
             appState.currentPage++;
@@ -489,44 +492,44 @@ document.addEventListener('DOMContentLoaded', () => {
             timestamp: new Date().toISOString(),
             data: appState.formData
         };
+        log("Submitting survey (complete).", submission);
         storeSubmission(submission);
         showCompletionScreen();
         await syncData(); // Attempt to sync immediately after completion
     };
 
     const autoSubmitSurvey = () => {
-        if (!appState.isUserActive) {
-            log("User inactive. Starting auto-submit countdown.");
-            
-            // Clear any existing countdown timer before starting a new one
-            if (appState.countdownIntervalId) {
-                clearInterval(appState.countdownIntervalId);
-            }
+        // The condition to run is that the countdown is triggered, not the user state.
+        log("Auto-submit triggered. Starting countdown.");
 
-            overlay.classList.remove('hidden'); // Show the overlay
-            let countdown = config.autoSubmitCountdown;
-            countdownSpan.textContent = countdown;
-            
-            appState.countdownIntervalId = setInterval(() => {
-                countdown--;
-                countdownSpan.textContent = countdown;
-                if (countdown <= 0) {
-                    clearInterval(appState.countdownIntervalId);
-                    log("Auto-submitting incomplete survey.");
-                    const submission = {
-                        id: uuidv4(),
-                        timestamp: new Date().toISOString(),
-                        data: appState.formData,
-                        is_incomplete: true
-                    };
-                    storeSubmission(submission);
-                    resetSurvey();
-                    syncData();
-                }
-            }, 1000);
+        // Clear any existing countdown timer before starting a new one
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
         }
+
+        overlay.classList.remove('hidden'); // Show the overlay
+        let countdown = config.autoSubmitCountdown;
+        countdownSpan.textContent = countdown;
+
+        appState.countdownIntervalId = setInterval(() => {
+            countdown--;
+            countdownSpan.textContent = countdown;
+            if (countdown <= 0) {
+                clearInterval(appState.countdownIntervalId);
+                log("Auto-submitting incomplete survey.");
+                const submission = {
+                    id: uuidv4(),
+                    timestamp: new Date().toISOString(),
+                    data: appState.formData,
+                    is_incomplete: true
+                };
+                storeSubmission(submission);
+                resetSurvey();
+                syncData();
+            }
+        }, 1000);
     };
-    
+
     // --- Data Storage and API Communication ---
     const getStoredSubmissions = () => {
         try {
@@ -547,13 +550,13 @@ document.addEventListener('DOMContentLoaded', () => {
             showTemporaryMessage("Critical Error: Could not save response locally.", "error");
         }
     };
-    
+
     const removeSyncedSubmissions = (syncedIds) => {
         const submissions = getStoredSubmissions();
         const remaining = submissions.filter(sub => !syncedIds.includes(sub.id));
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     };
-    
+
     const syncData = async () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
@@ -568,7 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showTemporaryMessage(`Syncing ${submissions.length} submissions...`);
         const successfullySyncedIds = [];
-        
+
         for (const submission of submissions) {
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -577,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(submission),
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                
+
                 successfullySyncedIds.push(submission.id);
                 log(`Successfully synced submission ID: ${submission.id}`);
             } catch (error) {
@@ -626,16 +629,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetSurvey = () => {
         appState.currentPage = 0;
         appState.formData = {};
-        appState.isUserActive = false;
+        appState.isUserActive = false; // CRITICAL: Reset the user activity flag for the next session
         appState.stopRotationPermanently = false;
-        
+
         // Hide the overlay on every reset
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
         overlay.classList.add('hidden');
-        
+
         form.reset();
         nextButton.style.display = 'block';
         backButton.style.display = 'block';
@@ -687,31 +690,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         overlay.classList.add('hidden');
         // CRITICAL FIX: Restart the inactivity timer after the user cancels.
-        handleUserActivity(); 
+        handleUserActivity();
     });
 
     syncButton.addEventListener('click', syncData);
-
     adminClearButton.addEventListener('click', () => {
-        if (confirm("Are you sure you want to clear all locally stored data? This cannot be undone.")) {
-            localStorage.removeItem(LOCAL_STORAGE_KEY);
-            showTemporaryMessage("Local data cleared.", "success");
-            resetSurvey();
-            hideAdminControls();
-        }
+        log("Clearing all local data.");
+        localStorage.removeItem(LOCAL_STORAGE_KEY);
+        showTemporaryMessage("All local data cleared!", "success");
     });
-    
     hideAdminButton.addEventListener('click', hideAdminControls);
-    
-    window.addEventListener('online', () => {
-        showTemporaryMessage("You are back online. Attempting to sync.", "success");
-        syncData();
-    });
-    
-    // --- Initialization ---
+
+    // Initial setup
     renderPage(appState.currentPage);
-    // CRITICAL FIX: Call handleUserActivity on page load to start the initial timer.
-    handleUserActivity(); 
-    
-    appState.syncIntervalId = setInterval(syncData, 60 * 60 * 1000); // Attempt to sync every hour
+    handleUserActivity();
+
+    // Event listeners for overall user activity
+    document.addEventListener('mousemove', debouncedHandleActivity);
+    document.addEventListener('keypress', debouncedHandleActivity);
+    document.addEventListener('touchstart', debouncedHandleActivity);
+    window.addEventListener('scroll', debouncedHandleActivity);
 });
