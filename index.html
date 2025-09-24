@@ -543,7 +543,7 @@
                     break;
                 case 'number-scale':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `<div class="number-scale-group flex justify-between items-center space-x-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    html += `<div class="number-scale-group grid grid-cols-5 gap-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
                     for (let i = questionData.min; i <= questionData.max; i++) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
@@ -565,7 +565,7 @@
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
                     // A11y-friendly star rating HTML
                     html += `<div class="star-rating flex justify-center mt-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
-                    for (let i = questionData.min; i <= questionData.max; i++) {
+                    for (let i = questionData.max; i >= questionData.min; i--) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
                             <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="visually-hidden" ${checked} aria-label="${i} stars">
@@ -960,8 +960,14 @@
                 data: appState.formData
             };
             await storeSubmission(submission);
-            await syncData();
-            showCompletionScreen();
+            
+            try {
+                await syncData();
+            } catch (error) {
+                log("Data sync failed during submission, but will retry later.", error);
+            } finally {
+                showCompletionScreen();
+            }
         };
 
         const showCompletionScreen = () => {
