@@ -138,6 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         adminClickCount: 0,
         adminTimer: null,
         stopRotationPermanently: false,
+        syncIntervalId: null, // New state for the hourly sync timer
     };
 
     // --- Helper Functions ---
@@ -174,6 +175,12 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(appState.inactivityTimeout);
         appState.isUserActive = true;
         appState.stopRotationPermanently = true;
+        // CRITICAL FIX: Clear the countdown overlay and timer on activity
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+            overlay.classList.add('hidden');
+        }
 
         appState.inactivityTimeout = setTimeout(() => {
             if (appState.currentPage === 0 && Object.keys(appState.formData).length === 0) {
@@ -486,34 +493,40 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncData(); // Attempt to sync immediately after completion
     };
 
-  const autoSubmitSurvey = () => {
-    if (!appState.isUserActive) {
-        log("User inactive. Starting auto-submit countdown.");
-        overlay.classList.remove('hidden'); // Show the overlay
-        let countdown = config.autoSubmitCountdown;
-        countdownSpan.textContent = countdown;
-        
-        appState.countdownIntervalId = setInterval(() => {
-            countdown--;
-            countdownSpan.textContent = countdown;
-            if (countdown <= 0) {
+    const autoSubmitSurvey = () => {
+        if (!appState.isUserActive) {
+            log("User inactive. Starting auto-submit countdown.");
+            
+            // CRITICAL FIX: Clear any existing countdown timer before starting a new one
+            if (appState.countdownIntervalId) {
                 clearInterval(appState.countdownIntervalId);
-                // The actual submission logic goes here
-                log("Auto-submitting incomplete survey.");
-                const submission = {
-                    id: uuidv4(),
-                    timestamp: new Date().toISOString(),
-                    data: appState.formData,
-                    is_incomplete: true
-                };
-                storeSubmission(submission);
-                resetSurvey();
-                syncData();
             }
-        }, 1000);
-    }
-};
 
+            overlay.classList.remove('hidden'); // Show the overlay
+            let countdown = config.autoSubmitCountdown;
+            countdownSpan.textContent = countdown;
+            
+            appState.countdownIntervalId = setInterval(() => {
+                countdown--;
+                countdownSpan.textContent = countdown;
+                if (countdown <= 0) {
+                    clearInterval(appState.countdownIntervalId);
+                    // The actual submission logic goes here
+                    log("Auto-submitting incomplete survey.");
+                    const submission = {
+                        id: uuidv4(),
+                        timestamp: new Date().toISOString(),
+                        data: appState.formData,
+                        is_incomplete: true
+                    };
+                    storeSubmission(submission);
+                    resetSurvey();
+                    syncData();
+                }
+            }, 1000);
+        }
+    };
+    
     // --- Data Storage and API Communication ---
     const getStoredSubmissions = () => {
         try {
@@ -592,6 +605,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showCompletionScreen = () => {
+        // CRITICAL FIX: Hide the overlay if it was shown for auto-submit
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+        }
+        overlay.classList.add('hidden');
+
         questionContainer.innerHTML = `
             <div class="checkmark-container min-h-[300px]">
                 <div class="checkmark-circle"><div class="checkmark-icon">✓</div></div>
@@ -608,6 +628,14 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.formData = {};
         appState.isUserActive = false;
         appState.stopRotationPermanently = false;
+        
+        // CRITICAL FIX: Hide the overlay on every reset
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+        }
+        overlay.classList.add('hidden');
+        
         form.reset();
         nextButton.style.display = 'block';
         backButton.style.display = 'block';
@@ -652,6 +680,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Recommended: Cancel countdown on cancel button click
+    cancelButton.addEventListener('click', () => {
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+        }
+        overlay.classList.add('hidden');
+        handleUserActivity(); // Restart inactivity timer
+    });
+
     syncButton.addEventListener('click', syncData);
 
     adminClearButton.addEventListener('click', () => {
@@ -673,5 +711,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     renderPage(appState.currentPage);
     handleUserActivity();
-    setInterval(syncData, 60 * 60 * 1000); // Attempt to sync every hour
+    
+    // Recommended: Store interval ID for better management
+    appState.syncIntervalId = setInterval(syncData, 60 * 60 * 1000); // Attempt to sync every hour
 });
