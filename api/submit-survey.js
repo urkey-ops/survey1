@@ -2,101 +2,105 @@
 import { google } from 'googleapis';
 
 export default async function handler(request, response) {
-  if (request.method !== 'POST') {
-    return response.status(405).json({ message: 'Method Not Allowed' });
-  }
+  if (request.method !== 'POST') {
+    return response.status(405).json({ message: 'Method Not Allowed' });
+  }
 
-  const spreadsheetId = process.env.SPREADSHEET_ID;
-  if (!spreadsheetId) {
-    console.error('API Error: SPREADSHEET_ID environment variable is missing.');
-    return response.status(500).json({ message: 'Server configuration error.' });
-  }
+  // --- Configuration from Environment Variables ---
+  const { 
+    SPREADSHEET_ID, 
+    GOOGLE_SERVICE_ACCOUNT_EMAIL, 
+    GOOGLE_PRIVATE_KEY,
+    SHEET_NAME = 'Sheet1' // Default to 'Sheet1' if not set
+  } = process.env;
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
+  if (!SPREADSHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    console.error('API Error: Missing one or more required environment variables.');
+    return response.status(500).json({ message: 'Server configuration error.' });
+  }
 
-  const sheets = google.sheets({ version: 'v4', auth });
+  // --- Google Sheets Authentication ---
+  const auth = new google.auth.GoogleAuth({
+    credentials: {
+      client_email: GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      private_key: GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
 
-  try {
-    const {
-      id,
-      timestamp,
-      comments,
-      satisfaction,
-      cleanliness,
-      staff_friendliness,
-      location,
-      other_location, // New field for the "Other" location text
-      age,
-      name,
-      email,
-      newsletterConsent, // New field for subscription status
-    } = request.body;
-    
-    // --- Updated Server-Side Validation and Sanitization ---
-    
-    // Validate that the email is present if consent is given
-    if (newsletterConsent === 'Yes' && (!email || !/^\S+@\S+\.\S+$/.test(email))) {
-      console.error('Validation Error: Email is required for subscription or format is invalid.');
-      return response.status(400).json({ message: 'Email is required for subscription or format is invalid.' });
-    }
+  const sheets = google.sheets({ version: 'v4', auth });
 
-    // --- Sanitize and format data for Google Sheets, allowing for missing fields ---
-    const finalComments = (comments || '').trim();
-    const finalSatisfaction = satisfaction || '';
-    const finalCleanliness = cleanliness || '';
-    const finalStaffFriendliness = staff_friendliness || '';
-    const finalAge = age || '';
-    const finalName = (name || '').trim();
-    const finalEmail = (email || '').trim();
-    const finalNewsletterConsent = newsletterConsent || '';
+  try {
+    // --- 1. CORRECTLY Destructure Nested Data from Request Body ---
+    const { id, timestamp, data } = request.body;
 
-    // Handle "Other" location logic
-    const finalLocation = (location === 'Other' && other_location) ? other_location.trim() : (location || '');
-    
-    // Define the correct order of columns for your Google Sheet
-    const valuesToAppend = [
-      (timestamp || new Date().toISOString()),
-      id || '',
-      finalComments,
-      finalSatisfaction,
-      finalCleanliness,
-      finalStaffFriendliness,
-      finalLocation,
-      finalAge,
-      finalName,
-      finalEmail,
-      finalNewsletterConsent,
-    ];
+    // --- 2. ENHANCED Server-Side Validation ---
+    if (!id || !timestamp || !data) {
+      return response.status(400).json({ message: 'Invalid submission payload.' });
+    }
+    if (data.newsletterConsent === 'Yes' && (!data.email || !/^\S+@\S+\.\S+$/.test(data.email))) {
+      return response.status(400).json({ message: 'A valid email is required for subscription.' });
+    }
+    // Example of more validation: ensure cleanliness is a number between 1 and 5
+    if (data.cleanliness && !/^[1-5]$/.test(data.cleanliness)) {
+        return response.status(400).json({ message: 'Invalid value for cleanliness rating.' });
+    }
 
-    const resource = {
-      values: [valuesToAppend],
-    };
+    // --- 3. Sanitize and Format Data ---
+    const sanitizedData = {
+      id,
+      timestamp: timestamp || new Date().toISOString(),
+      comments: (data.comments || '').trim(),
+      satisfaction: data.satisfaction || '',
+      cleanliness: data.cleanliness || '',
+      staff_friendliness: data.staff_friendliness || '',
+      // Handle "Other" location logic
+      location: (data.location === 'Other' && data.other_location) 
+                ? data.other_location.trim() 
+                : (data.location || ''),
+      age: data.age || '',
+      name: (data.name || '').trim(),
+      email: (data.email || '').trim(),
+      newsletterConsent: data.newsletterConsent || '',
+    };
+    
+    // --- 4. IMPROVED Maintainability with a Column Order Array ---
+    // This array defines the exact order of columns in your Google Sheet.
+    // To add/remove/reorder columns, you only need to change this one line!
+    const columnOrder = [
+      'timestamp',
+      'id',
+      'comments',
+      'satisfaction',
+      'cleanliness',
+      'staff_friendliness',
+      'location',
+      'age',
+      'name',
+      'email',
+      'newsletterConsent',
+    ];
 
-    const range = 'Sheet1!A:K';
+    const valuesToAppend = columnOrder.map(key => sanitizedData[key] || '');
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range,
-      valueInputOption: 'USER_ENTERED',
-      resource,
-    });
+    // --- Append Data to Google Sheets ---
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SPREADSHEET_ID,
+      range: `${SHEET_NAME}!A1`, // Append to the first empty row of the specified sheet
+      valueInputOption: 'USER_ENTERED',
+      resource: {
+        values: [valuesToAppend],
+      },
+    });
 
-    console.log('Survey data successfully appended to Google Sheet.');
+    console.log('Survey data successfully appended to Google Sheet.');
+    return response.status(200).json({ message: 'Survey submitted successfully!' });
 
-    response.status(200).json({ message: 'Survey submitted successfully!' });
-
-  } catch (error) {
-    console.error('API Error:', error.message);
-    if (error.response) {
-      console.error('API Response Data:', error.response.data);
-    }
-    
-    response.status(500).json({ message: 'Internal Server Error' });
-  }
+  } catch (error) {
+    console.error('API Error:', error.message);
+    if (error.response) {
+      console.error('API Response Data:', error.response.data);
+    }
+    return response.status(500).json({ message: 'Internal Server Error' });
+  }
 }
