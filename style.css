@@ -11,6 +11,7 @@ body {
     color: #333;
 }
 
+/* Visually hidden for accessibility */
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -22,6 +23,7 @@ body {
     border: 0;
 }
 
+/* Selected emoji-radio and number-scale styles */
 .emoji-radio-group input:checked + label,
 .number-scale-group input:checked + label {
     border-color: var(--sewa-orange);
@@ -31,6 +33,7 @@ body {
     color: var(--sewa-orange);
 }
 
+/* Labels hover and transition styles */
 .emoji-radio-group label,
 .number-scale-group label,
 .location-radio-group label {
@@ -38,7 +41,7 @@ body {
     cursor: pointer;
 }
 
-/* New a11y-friendly star rating CSS */
+/* Accessibility-friendly star rating styles */
 .star-rating input {
     display: none;
 }
@@ -52,6 +55,7 @@ body {
     color: #ffc107;
 }
 
+/* Location radio group selected style */
 .location-radio-group input:checked + label {
     background-color: var(--sewa-orange);
     color: white;
@@ -59,20 +63,21 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
+/* Hidden fields - animate height with max-height for smooth transition */
 .hidden-fields {
     opacity: 0;
-    height: 0;
-    pointer-events: none;
+    max-height: 0;
     overflow: hidden;
-    transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out;
 }
-
 .visible-fields {
     opacity: 1;
-    height: auto;
+    max-height: 1000px; /* set to a large enough value to animate open */
     pointer-events: auto;
 }
 
+/* Loading bar styles */
 .loading-bar-container {
     width: 100%;
     background-color: #e2e8f0;
@@ -80,7 +85,6 @@ body {
     height: 12px;
     overflow: hidden;
 }
-
 .loading-bar {
     height: 100%;
     background-color: var(--sewa-blue);
@@ -88,6 +92,7 @@ body {
     transition: width 0.3s ease-in-out;
 }
 
+/* Error message styles */
 .error-message {
     color: #dc2626;
     font-size: 0.875rem;
@@ -95,13 +100,15 @@ body {
     display: block;
 }
 
+/* Error state style for inputs/containers */
 .has-error {
     border-color: #dc2626 !important;
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
 
+/* Overlay styles for modal / auto-submit countdown */
 #overlay {
-    position: absolute;
+    position: fixed; /* Use fixed for overlays to cover entire viewport */
     top: 0;
     left: 0;
     width: 100%;
@@ -113,31 +120,35 @@ body {
     align-items: center;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.5s ease, visibility 0.5s ease;
     z-index: 50;
 }
-
 #overlay.visible {
     opacity: 1;
     visibility: visible;
 }
 
+/* Cancel button styles */
 #cancelButton {
     background-color: #ef4444;
     color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
 }
-
 #cancelButton:hover {
     background-color: #dc2626;
 }
 
+/* Checkmark animation styles */
 .checkmark-container {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    min-height: 300px;
 }
-
 .checkmark-circle {
     width: 100px;
     height: 100px;
@@ -148,13 +159,13 @@ body {
     align-items: center;
     animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
 }
-
 .checkmark-icon {
     color: white;
     font-size: 4rem;
     font-weight: bold;
 }
 
+/* BounceIn keyframes for checkmark */
 @keyframes bounceIn {
     0% {
         transform: scale(0);
@@ -169,6 +180,7 @@ body {
     }
 }
 
+/* Spinner styles for loading states */
 .spinner {
     border: 4px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
@@ -177,7 +189,14 @@ body {
     height: 1.5rem;
     animation: spin 1s ease-in-out infinite;
 }
-
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Focus outline for accessibility */
+input:focus, textarea:focus, button:focus, label:focus {
+    outline: 2px solid var(--sewa-orange);
+    outline-offset: 2px;
 }
