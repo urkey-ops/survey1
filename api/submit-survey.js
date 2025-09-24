@@ -11,7 +11,7 @@ export default async function handler(request, response) {
     SPREADSHEET_ID, 
     GOOGLE_SERVICE_ACCOUNT_EMAIL, 
     GOOGLE_PRIVATE_KEY,
-    SHEET_NAME = 'Sheet1' // Default to 'Sheet1' if not set
+    SHEET_NAME = 'Sheet1' 
   } = process.env;
 
   if (!SPREADSHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
@@ -31,42 +31,37 @@ export default async function handler(request, response) {
   const sheets = google.sheets({ version: 'v4', auth });
 
   try {
-    // --- 1. CORRECTLY Destructure Nested Data from Request Body ---
+    // --- 1. DESTRUCTURE and VALIDATE Core Payload ---
     const { id, timestamp, data } = request.body;
 
-    // --- 2. ENHANCED Server-Side Validation ---
     if (!id || !timestamp || !data) {
       return response.status(400).json({ message: 'Invalid submission payload.' });
     }
-    if (data.newsletterConsent === 'Yes' && (!data.email || !/^\S+@\S+\.\S+$/.test(data.email))) {
-      return response.status(400).json({ message: 'A valid email is required for subscription.' });
-    }
-    // Example of more validation: ensure cleanliness is a number between 1 and 5
-    if (data.cleanliness && !/^[1-5]$/.test(data.cleanliness)) {
-        return response.status(400).json({ message: 'Invalid value for cleanliness rating.' });
-    }
 
-    // --- 3. Sanitize and Format Data ---
-    const sanitizedData = {
+    // --- 2. PREPARE and SANITIZE Data for Google Sheet ---
+    // This object ensures all fields have a default value and are sanitized
+    const submissionData = {
+      // Use the ID and timestamp from the client for consistency
       id,
-      timestamp: timestamp || new Date().toISOString(),
+      timestamp,
       comments: (data.comments || '').trim(),
       satisfaction: data.satisfaction || '',
       cleanliness: data.cleanliness || '',
       staff_friendliness: data.staff_friendliness || '',
-      // Handle "Other" location logic
-      location: (data.location === 'Other' && data.other_location) 
-                ? data.other_location.trim() 
-                : (data.location || ''),
+      location: (data.location === 'Other' && data.other_location)
+        ? data.other_location.trim()
+        : (data.location || ''),
       age: data.age || '',
       name: (data.name || '').trim(),
       email: (data.email || '').trim(),
       newsletterConsent: data.newsletterConsent || '',
+      // Use a ternary check to determine if the submission is incomplete
+      is_incomplete: data.is_incomplete ? 'Yes' : 'No', 
     };
-    
-    // --- 4. IMPROVED Maintainability with a Column Order Array ---
-    // This array defines the exact order of columns in your Google Sheet.
-    // To add/remove/reorder columns, you only need to change this one line!
+
+    // --- 3. Define Column Order for Google Sheet ---
+    // This is the single source of truth for your sheet's columns.
+    // Ensure these match the headers in your Google Sheet.
     const columnOrder = [
       'timestamp',
       'id',
@@ -79,14 +74,15 @@ export default async function handler(request, response) {
       'name',
       'email',
       'newsletterConsent',
+      'is_incomplete',
     ];
 
-    const valuesToAppend = columnOrder.map(key => sanitizedData[key] || '');
+    const valuesToAppend = columnOrder.map(key => submissionData[key] || '');
 
     // --- Append Data to Google Sheets ---
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
-      range: `${SHEET_NAME}!A1`, // Append to the first empty row of the specified sheet
+      range: `${SHEET_NAME}!A1`, 
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [valuesToAppend],
