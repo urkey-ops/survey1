@@ -39,25 +39,42 @@ export default async function handler(request, response) {
       newsletterConsent,
     } = request.body;
     
-    // --- Server-Side Validation (unchanged from your code) ---
+    // --- Server-Side Validation and Sanitization ---
+    
+    // Validate required fields to prevent empty submissions
     if (!comments || !satisfaction || !cleanliness || !staff_friendliness) {
       console.error('Validation Error: Missing required fields.');
       return response.status(400).json({ message: 'Missing required survey data.' });
     }
     
+    // Validate that the email, if provided, is in a valid format.
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
       console.error('Validation Error: Invalid email format.');
       return response.status(400).json({ message: 'Invalid email format.' });
     }
-    
+
+    // Validate cleanliness rating (must be an integer between 1 and 5)
     const cleanlinessRating = parseInt(cleanliness);
     if (isNaN(cleanlinessRating) || cleanlinessRating < 1 || cleanlinessRating > 5) {
       console.error('Validation Error: Invalid cleanliness rating.');
       return response.status(400).json({ message: 'Invalid cleanliness rating.' });
     }
+    
+    // Validate satisfaction rating (must be one of the expected string values)
+    const validSatisfactionValues = ['Sad', 'Neutral', 'Happy'];
+    if (!validSatisfactionValues.includes(satisfaction)) {
+      console.error('Validation Error: Invalid satisfaction rating.');
+      return response.status(400).json({ message: 'Invalid satisfaction rating.' });
+    }
+    
+    // Validate staff friendliness rating (must be an integer between 1 and 5)
+    const staffFriendlinessRating = parseInt(staff_friendliness);
+    if (isNaN(staffFriendlinessRating) || staffFriendlinessRating < 1 || staffFriendlinessRating > 5) {
+      console.error('Validation Error: Invalid staff friendliness rating.');
+      return response.status(400).json({ message: 'Invalid staff friendliness rating.' });
+    }
 
-    // --- Dynamic Data Mapping for Google Sheets ---
-    // Define the column order in your Google Sheet (A, B, C, etc.)
+    // Define the correct order of columns for your Google Sheet (A, B, C, etc.).
     const columns = [
       'timestamp',
       'id',
@@ -72,12 +89,15 @@ export default async function handler(request, response) {
       'newsletterConsent',
     ];
 
-    // Get the values from the request body in the correct order
+    // Get the values from the request body in the correct order,
+    // and sanitize string values by trimming whitespace.
     const valuesToAppend = columns.map(columnName => {
-      // Use request.body to get the value for the corresponding column name
-      // This will correctly handle missing or null values
-      const value = request.body[columnName];
-      // Return the value, or an empty string for missing data to ensure the row stays aligned.
+      let value = request.body[columnName];
+      // Trim any string values to remove leading/trailing whitespace
+      if (typeof value === 'string') {
+        value = value.trim();
+      }
+      // Return the value, or an empty string for missing data to ensure row alignment.
       return value || '';
     });
 
@@ -85,8 +105,7 @@ export default async function handler(request, response) {
       values: [valuesToAppend],
     };
 
-    // The range for the append operation. This will ensure data is added in the next available row from column A.
-    // The previous issue was likely caused by the data itself having empty cells, and the append method skipping over them.
+    // The range for the append operation. This ensures data is added in the next available row from column A.
     const range = 'Sheet1!A:K';
 
     // Append the data to the Google Sheet.
