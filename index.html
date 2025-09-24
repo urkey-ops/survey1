@@ -15,11 +15,10 @@
 
         body {
             font-family: 'Roboto', sans-serif;
-            background-color: #f0f4f8; /* Light gray-blue background */
+            background-color: #f0f4f8;
             color: #333;
         }
-        
-        /* Custom Styles for Survey Elements */
+
         .visually-hidden {
             position: absolute;
             width: 1px;
@@ -42,30 +41,30 @@
 
         .emoji-radio-group label,
         .number-scale-group label,
-        .location-radio-group label,
-        .star-rating label {
+        .location-radio-group label {
             transition: all 0.2s ease-in-out;
             cursor: pointer;
         }
 
+        .star-rating label {
+            color: #d1d5db;
+            font-size: 3rem;
+        }
+        
+        /* New a11y-friendly star rating CSS */
         .star-rating input {
             display: none;
         }
-
-        .star-rating label {
-            color: #d1d5db; /* Gray star */
-            font-size: 3rem;
-        }
-
-        .star-rating input:checked ~ label {
-            color: #ffc107; /* Gold star */
-        }
-
-        .star-rating label:hover,
-        .star-rating label:hover ~ label {
+        .star-rating input:checked ~ label,
+        .star-rating input:checked ~ label:hover,
+        .star-rating input:checked ~ label:hover ~ label {
             color: #ffc107;
         }
-        
+        .star-rating input:not(:checked) ~ label:hover,
+        .star-rating input:not(:checked) ~ label:hover ~ label {
+            color: #ffc107;
+        }
+
         .location-radio-group input:checked + label {
             background-color: var(--sewa-orange);
             color: white;
@@ -86,7 +85,7 @@
             height: auto;
             pointer-events: auto;
         }
-        
+
         .loading-bar-container {
             width: 100%;
             background-color: #e2e8f0;
@@ -103,18 +102,17 @@
         }
 
         .error-message {
-            color: #dc2626; /* Red-700 */
-            font-size: 0.875rem; /* text-sm */
-            margin-top: 0.25rem; /* mt-1 */
+            color: #dc2626;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
             display: block;
         }
-        
+
         .has-error {
             border-color: #dc2626 !important;
             box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
         }
-        
-        /* Auto-submit Overlay */
+
         #overlay {
             position: absolute;
             top: 0;
@@ -131,21 +129,21 @@
             transition: opacity 0.5s ease;
             z-index: 50;
         }
-        
+
         #overlay.visible {
             opacity: 1;
             visibility: visible;
         }
 
         #cancelButton {
-            background-color: #ef4444; /* Red-500 */
+            background-color: #ef4444;
             color: white;
         }
+
         #cancelButton:hover {
-            background-color: #dc2626; /* Red-600 */
+            background-color: #dc2626;
         }
-        
-        /* Thank You Screen */
+
         .checkmark-container {
             display: flex;
             flex-direction: column;
@@ -157,7 +155,7 @@
             width: 100px;
             height: 100px;
             border-radius: 50%;
-            background-color: #22c55e; /* Green-500 */
+            background-color: #22c55e;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -169,18 +167,26 @@
             font-size: 4rem;
             font-weight: bold;
         }
-        
+
         @keyframes bounceIn {
-            0% { transform: scale(0); opacity: 0; }
-            60% { transform: scale(1.1); opacity: 1; }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(0);
+                opacity: 0;
+            }
+            60% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1);
+            }
         }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 sm:p-8">
     <main class="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden min-h-[500px] flex flex-col">
         <header class="bg-gray-50 border-b border-gray-200 py-4 px-6 flex justify-between items-center relative">
-            <h1 id="mainTitle" class="text-xl font-bold text-gray-800 cursor-pointer">Sewa International</h1>
+            <h1 id="mainTitle" class="text-xl font-bold text-gray-800 cursor-pointer">Customer Feedback</h1>
             <div class="absolute inset-x-0 bottom-0">
                 <div id="progressBarContainer" class="loading-bar-container">
                     <div id="progressBar" class="loading-bar" style="width: 0;"></div>
@@ -203,7 +209,7 @@
                 </div>
             </form>
         </section>
-        
+
         <div id="overlay">
             <div class="p-8 bg-white rounded-lg shadow-xl text-center">
                 <p id="overlayMessage" class="text-xl font-bold mb-4">Survey auto-submitting in <span id="countdown">5</span> seconds...</p>
@@ -213,7 +219,7 @@
     </main>
 
     <script>
-        // --- DOM Elements & Configuration ---
+        // --- Core Application Logic ---
         const form = document.getElementById('surveyForm');
         const statusMessage = document.getElementById('statusMessage');
         const syncButton = document.getElementById('syncButton');
@@ -227,6 +233,7 @@
         const overlayMessage = document.getElementById('overlayMessage');
         const countdownSpan = document.getElementById('countdown');
         const cancelButton = document.getElementById('cancelButton');
+        const progressBar = document.getElementById('progressBar');
 
         const DEBUG_MODE = true;
         const log = (message, ...args) => {
@@ -241,12 +248,15 @@
             resetTime: 5000,
             adminClicksRequired: 5,
             adminClickTimeout: 3000,
-            inactivityTime: 30000, // 30 seconds
-            autoSubmitCountdown: 5, // 5-second countdown
+            inactivityTime: 30000,
+            autoSubmitCountdown: 5,
             debounceDelay: 200,
             maxRetries: 5,
             baseDelay: 500,
         };
+        
+        const API_ENDPOINT = '/api/submit-survey';
+        const localStorageKey = 'surveySubmissions';
 
         const surveyQuestions = [
             {
@@ -337,7 +347,6 @@
             }
         ];
 
-        // --- Application State ---
         const appState = {
             currentPage: 0,
             formData: {},
@@ -410,7 +419,7 @@
             appState.typingTimeout = null;
             appState.displayTimeout = null;
         };
-        
+
         // Inactivity Timer & Countdown Logic
         const clearCountdown = () => {
             clearInterval(appState.countdownInterval);
@@ -419,35 +428,33 @@
                 countdownSpan.textContent = config.autoSubmitCountdown;
             }
         };
-        
+
         const cancelAutoSubmit = () => {
             log("User activity detected during countdown. Aborting auto-submit.");
             clearTimeout(appState.inactivityTimeout);
             clearCountdown();
-            
+
             overlayMessage.textContent = "Countdown Canceled. Please continue with your survey.";
             cancelButton.classList.add('hidden');
-            
-            // Immediately restart the inactivity timer on cancel
+
             handleUserActivity();
 
             setTimeout(() => {
                 toggleUserInteraction(true);
                 overlayMessage.innerHTML = 'Survey auto-submitting in <span id="countdown">5</span> seconds...';
-            }, 1500); // Give user a moment to read the message
+            }, 1500);
         }
 
         const handleUserActivity = () => {
-            // First, cancel any pending auto-submit or countdown
             clearTimeout(appState.inactivityTimeout);
             clearCountdown();
-            
+
             log("User activity detected. Resetting inactivity timer.");
             appState.isUserActive = true;
             appState.stopRotationPermanently = true;
-            
+
             if (appState.currentPage !== 0) {
-                stopQuestionRotation();
+                appState.stopRotationOnCompletion = true;
             }
 
             appState.inactivityTimeout = setTimeout(() => {
@@ -469,12 +476,11 @@
             } else {
                 questionElement.textContent = text;
                 appState.isTyping = false;
-                
-                // New logic to handle deferred stopping
+        
                 if (appState.stopRotationOnCompletion) {
                     log("Typing completed, stopping rotation as requested by user interaction.");
                     stopQuestionRotation();
-                    appState.stopRotationOnCompletion = false;
+                    appState.stopRotationOnCompletion = false; 
                 } else if (!appState.isUserActive) {
                     appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
                 }
@@ -485,21 +491,21 @@
             const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
             if (!rotatingQuestionEl || appState.stopRotationPermanently) return;
             stopQuestionRotation();
-            
+
             const questionData = surveyQuestions[0];
             const currentQuestion = questionData.rotatingText[appState.questionRotationIndex];
             rotatingQuestionEl.textContent = "";
             appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
             typeWriter(currentQuestion, 0);
         };
-        
+
         const debouncedHandleActivity = debounce(handleUserActivity, config.debounceDelay);
         const debouncedValidate = debounce(runValidation, 500);
 
         // --- Survey Page Logic ---
         const renderPage = (pageIndex) => {
             resetRadioAndCheckboxStates();
-            
+
             const questionData = surveyQuestions[pageIndex];
             if (!questionData) return;
 
@@ -557,11 +563,12 @@
                     break;
                 case 'star-rating':
                     html = `<label id="${questionData.id}Label" class="block text-gray-700 font-semibold mb-2">${questionData.question}</label>`;
-                    html += `<div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
-                    for (let i = questionData.max; i >= questionData.min; i--) {
+                    // A11y-friendly star rating HTML
+                    html += `<div class="star-rating flex justify-center mt-2" role="radiogroup" aria-labelledby="${questionData.id}Label">`;
+                    for (let i = questionData.min; i <= questionData.max; i++) {
                         const checked = parseInt(appState.formData[questionData.name]) === i ? 'checked' : '';
                         html += `
-                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" ${checked} aria-label="${i} stars">
+                            <input type="radio" id="${questionData.id + i}" name="${questionData.name}" value="${i}" class="visually-hidden" ${checked} aria-label="${i} stars">
                             <label for="${questionData.id + i}" class="star text-4xl sm:text-5xl pr-1">★</label>
                         `;
                     }
@@ -601,7 +608,7 @@
                     const newsletterConsentChecked = appState.formData['newsletterConsent'] === 'Yes' ? 'checked' : '';
                     const emailValue = appState.formData['email'] || '';
                     const emailFieldVisibleClass = newsletterConsentChecked ? 'visible-fields' : 'hidden-fields';
-                    
+
                     html = `
                         <div class="space-y-4">
                             <div>
@@ -655,7 +662,7 @@
                 input.classList.remove('has-error');
             });
         };
-        
+
         const showValidationError = (fieldId, message) => {
             const errorSpan = document.getElementById(`${fieldId}Error`);
             const fieldInput = document.getElementById(fieldId);
@@ -666,7 +673,6 @@
             if (fieldInput) {
                 fieldInput.classList.add('has-error');
             }
-            // For radio/checkbox groups, find the parent to apply error class
             if (!fieldInput && errorSpan) {
                 const parentGroup = errorSpan.closest('.emoji-radio-group, .number-scale-group, .star-rating, .location-radio-group');
                 if (parentGroup) {
@@ -678,7 +684,7 @@
         const validatePage = () => {
             const questionData = surveyQuestions[appState.currentPage];
             const errors = {};
-            
+
             const currentPageData = {};
             const inputs = questionContainer.querySelectorAll('input, textarea');
             inputs.forEach(input => {
@@ -691,7 +697,6 @@
                 }
             });
 
-            // Specific validation based on question type
             if (questionData.type === 'textarea') {
                 const value = currentPageData[questionData.name]?.trim();
                 if (questionData.required && (!value || value.length === 0)) {
@@ -712,11 +717,11 @@
                 const nameValue = currentPageData['name']?.trim();
                 const newsletterConsent = currentPageData['newsletterConsent'] === 'Yes';
                 const emailValue = currentPageData['email']?.trim();
-                
+
                 if (!nameValue || nameValue.length === 0) {
                     errors['name'] = 'Name is required.';
                 }
-                
+
                 if (newsletterConsent && (!emailValue || emailValue.length === 0)) {
                     errors['email'] = 'Email is required for subscription.';
                 } else if (emailValue && !/^\S+@\S+\.\S+$/.test(emailValue)) {
@@ -724,7 +729,6 @@
                 }
             }
 
-            // Save valid data, and display errors
             clearValidationErrors();
             if (Object.keys(errors).length > 0) {
                 for (const fieldId in errors) {
@@ -745,7 +749,7 @@
         const toggleEmailFieldVisibility = (isVisible) => {
             const emailContainer = document.getElementById('email-field-container');
             const emailInput = document.getElementById('email');
-            
+
             if (isVisible) {
                 emailContainer.classList.remove('hidden-fields');
                 emailContainer.classList.add('visible-fields');
@@ -754,27 +758,24 @@
                 emailContainer.classList.remove('visible-fields');
                 emailContainer.classList.add('hidden-fields');
                 emailInput.removeAttribute('required');
-                emailInput.value = ''; // Clear the email value if the field is hidden
+                emailInput.value = '';
             }
         };
-        
-        // --- Logic to handle auto-advancing the survey ---
+
         const handleNextQuestion = () => {
             if (validatePage()) {
                 if (appState.currentPage < surveyQuestions.length - 1) {
                     appState.currentPage++;
                     renderPage(appState.currentPage);
                 } else {
-                    submitSurvey();
+                    submitSurveyAndHandleCompletion();
                 }
             }
         };
-        // --- End of New Logic ---
 
         const setupEventListeners = () => {
             const questionData = surveyQuestions[appState.currentPage];
-            
-            // Clear all existing listeners on question container inputs
+
             const inputs = questionContainer.querySelectorAll('input, textarea');
             inputs.forEach(input => {
                 input.removeEventListener('input', debouncedHandleActivity);
@@ -785,7 +786,6 @@
             form.removeEventListener('keydown', debouncedHandleActivity);
             form.removeEventListener('click', debouncedHandleActivity);
 
-            // Reattach new listeners
             if (questionData.type === 'textarea') {
                 const textarea = document.getElementById('comments');
                 if (textarea) {
@@ -801,11 +801,10 @@
                 const otherRadio = document.getElementById('locationOther');
                 const otherLocationContainer = document.getElementById('other-location-container');
                 const allRadios = document.querySelectorAll('input[name="location"]');
-                
-                // Handle radio changes for both auto-advance and 'Other' option
+
                 allRadios.forEach(radio => {
                     radio.addEventListener('change', () => {
-                        debouncedValidate(); // Always validate on change
+                        debouncedValidate();
                         if (radio.value === 'Other') {
                             otherLocationContainer.classList.remove('hidden');
                             nextButton.style.display = 'block';
@@ -825,13 +824,10 @@
                         debouncedValidate();
                     });
                 }
-                // Handle initial state of email field
                 if (newsletterCheckbox) {
                     toggleEmailFieldVisibility(newsletterCheckbox.checked);
                 }
-            }
-            // --- New Logic: Auto-advance for single-choice questions ---
-            else if (['emoji-radio', 'number-scale', 'star-rating', 'radio'].includes(questionData.type)) {
+            } else if (['emoji-radio', 'number-scale', 'star-rating', 'radio'].includes(questionData.type)) {
                 const radioButtons = questionContainer.querySelectorAll('input[type="radio"]');
                 radioButtons.forEach(radio => {
                     radio.addEventListener('change', () => {
@@ -840,23 +836,92 @@
                     });
                 });
             }
-            // --- End of New Logic ---
 
-            // Reattach activity and validation listeners for all inputs on the page
             inputs.forEach(input => {
                 input.addEventListener('input', debouncedHandleActivity);
                 input.addEventListener('change', debouncedHandleActivity);
-                
+
                 if (input.type === 'text' || input.type === 'textarea' || input.type === 'email') {
                     input.addEventListener('blur', debouncedValidate);
                 } else if (input.type === 'radio' || input.type === 'checkbox') {
                     input.addEventListener('change', debouncedValidate);
                 }
             });
-            
-            // Handle form input on-screen
+
             form.addEventListener('keydown', debouncedHandleActivity);
             form.addEventListener('click', debouncedHandleActivity);
+        };
+
+        // --- Data Storage and API Communication ---
+        const getStoredSubmissions = () => {
+            try {
+                const submissions = JSON.parse(localStorage.getItem(localStorageKey) || '[]');
+                return Array.isArray(submissions) ? submissions : [];
+            } catch (e) {
+                console.error("Failed to parse submissions from localStorage", e);
+                return [];
+            }
+        };
+
+        const storeSubmission = (submission) => {
+            const submissions = getStoredSubmissions();
+            submissions.push(submission);
+            localStorage.setItem(localStorageKey, JSON.stringify(submissions));
+        };
+
+        const removeSyncedSubmissions = (syncedIds) => {
+            const submissions = getStoredSubmissions();
+            const remaining = submissions.filter(sub => !syncedIds.includes(sub.id));
+            localStorage.setItem(localStorageKey, JSON.stringify(remaining));
+        };
+
+        const submitSurveyAPI = async (data) => {
+            const response = await fetch(API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        };
+
+        const syncData = async () => {
+            const submissions = getStoredSubmissions();
+            if (submissions.length === 0) {
+                log("No offline submissions to sync.");
+                return;
+            }
+
+            showTemporaryMessage(`Syncing ${submissions.length} offline submissions...`);
+            const successfullySyncedIds = [];
+            let networkErrorOccurred = false;
+
+            for (const submission of submissions) {
+                try {
+                    await submitSurveyAPI(submission);
+                    successfullySyncedIds.push(submission.id);
+                    log(`Successfully synced submission ID: ${submission.id}`);
+                } catch (error) {
+                    if (error.message.includes('HTTP error')) {
+                        log(`Server error for submission ID: ${submission.id}. Retrying later.`, error);
+                    } else {
+                        log(`Network error for submission ID: ${submission.id}. Sync will resume on next attempt.`, error);
+                        networkErrorOccurred = true;
+                        break;
+                    }
+                }
+            }
+
+            if (successfullySyncedIds.length > 0) {
+                removeSyncedSubmissions(successfullySyncedIds);
+                showTemporaryMessage(`Synced ${successfullySyncedIds.length} submissions.`, 'success');
+            }
+
+            if (networkErrorOccurred) {
+                showTemporaryMessage('Sync failed. Please check connection.', 'error');
+            }
         };
 
         const autoSubmitSurvey = () => {
@@ -867,7 +932,6 @@
             }
 
             log("Starting auto-submit countdown.");
-            
             let countdown = config.autoSubmitCountdown;
             countdownSpan.textContent = countdown;
             toggleUserInteraction(false);
@@ -884,36 +948,20 @@
                 if (countdown <= 0) {
                     clearCountdown();
                     toggleUserInteraction(false, "Submitting...");
-                    submitSurvey();
+                    submitSurveyAndHandleCompletion();
                 }
             }, 1000);
         };
-        
-        const submitSurvey = async () => {
-            try {
-                toggleUserInteraction(false, "Submitting data...");
-                log("Submitting form data:", appState.formData);
 
-                const response = await fetch('/api/submit-survey', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(appState.formData),
-                });
-
-                if (!response.ok) {
-                    throw new Error('Network response was not ok.');
-                }
-
-                const result = await response.json();
-                log('API Response:', result);
-
-                showCompletionScreen();
-                
-            } catch (error) {
-                console.error('Submission failed:', error);
-                showTemporaryMessage('Submission failed. Please try again or inform staff.', 'error');
-                toggleUserInteraction(true);
-            }
+        const submitSurveyAndHandleCompletion = async () => {
+            const submission = {
+                id: uuidv4(),
+                timestamp: new Date().toISOString(),
+                data: appState.formData
+            };
+            await storeSubmission(submission);
+            await syncData();
+            showCompletionScreen();
         };
 
         const showCompletionScreen = () => {
@@ -926,7 +974,6 @@
                     <p class="text-gray-600 mt-2">Your feedback has been submitted successfully.</p>
                 </div>
             `;
-            // Reset after a delay
             setTimeout(() => {
                 resetSurvey();
             }, config.resetTime);
@@ -942,12 +989,10 @@
             overlayMessage.innerHTML = 'Survey auto-submitting in <span id="countdown">5</span> seconds...';
             cancelButton.classList.add('hidden');
             form.reset();
-            clearCountdown(); // Ensure any ongoing countdown is stopped on reset.
+            clearCountdown();
             renderPage(appState.currentPage);
-            
-            // Re-enable user interaction
+
             toggleUserInteraction(true);
-            // Restart the inactivity timer on fresh load
             handleUserActivity();
         };
 
@@ -996,11 +1041,19 @@
                 clearTimeout(appState.adminTimer);
             }
         });
-        
+
+        syncButton.addEventListener('click', syncData);
+        adminClearButton.addEventListener('click', () => {
+            localStorage.clear();
+            showTemporaryMessage("Local data cleared.", "success");
+            resetSurvey();
+        });
+
         // --- Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
             renderPage(appState.currentPage);
-            handleUserActivity(); // Start the inactivity timer on initial page load
+            handleUserActivity();
+            syncData();
         });
     </script>
 </body>
