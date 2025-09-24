@@ -181,6 +181,19 @@
                 transform: scale(1);
             }
         }
+        
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            width: 1.5rem;
+            height: 1.5rem;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 sm:p-8">
@@ -257,6 +270,7 @@
         
         const API_ENDPOINT = '/api/submit-survey';
         const localStorageKey = 'surveySubmissions';
+        let lastSyncDate = null;
 
         const surveyQuestions = [
             {
@@ -681,67 +695,6 @@
             }
         };
 
-        const validatePage = () => {
-            const questionData = surveyQuestions[appState.currentPage];
-            const errors = {};
-
-            const currentPageData = {};
-            const inputs = questionContainer.querySelectorAll('input, textarea');
-            inputs.forEach(input => {
-                if (input.type === 'radio' && input.checked) {
-                    currentPageData[input.name] = input.value;
-                } else if (input.type === 'checkbox') {
-                    currentPageData[input.name] = input.checked ? 'Yes' : 'No';
-                } else if (input.type !== 'radio') {
-                    currentPageData[input.name] = input.value;
-                }
-            });
-
-            if (questionData.type === 'textarea') {
-                const value = currentPageData[questionData.name]?.trim();
-                if (questionData.required && (!value || value.length === 0)) {
-                    errors[questionData.id] = 'This field is required.';
-                }
-            } else if (questionData.type === 'emoji-radio' || questionData.type === 'number-scale' || questionData.type === 'radio' || questionData.type === 'star-rating') {
-                if (questionData.required && !currentPageData[questionData.name]) {
-                    errors[questionData.id] = 'Please make a selection.';
-                }
-            } else if (questionData.type === 'radio-with-other') {
-                const selectedValue = currentPageData[questionData.name];
-                const otherLocationValue = currentPageData['other_location']?.trim();
-
-                if (selectedValue === 'Other' && (!otherLocationValue || otherLocationValue.length === 0)) {
-                    errors['other_location_text'] = 'Please specify your location.';
-                }
-            } else if (questionData.type === 'custom-contact') {
-                const nameValue = currentPageData['name']?.trim();
-                const newsletterConsent = currentPageData['newsletterConsent'] === 'Yes';
-                const emailValue = currentPageData['email']?.trim();
-
-                if (!nameValue || nameValue.length === 0) {
-                    errors['name'] = 'Name is required.';
-                }
-
-                if (newsletterConsent && (!emailValue || emailValue.length === 0)) {
-                    errors['email'] = 'Email is required for subscription.';
-                } else if (emailValue && !/^\S+@\S+\.\S+$/.test(emailValue)) {
-                    errors['email'] = 'Please enter a valid email address.';
-                }
-            }
-
-            clearValidationErrors();
-            if (Object.keys(errors).length > 0) {
-                for (const fieldId in errors) {
-                    showValidationError(fieldId, errors[fieldId]);
-                }
-                return false;
-            } else {
-                Object.assign(appState.formData, currentPageData);
-                log("Current form data:", appState.formData);
-                return true;
-            }
-        };
-
         function runValidation() {
             validatePage();
         }
@@ -762,13 +715,27 @@
             }
         };
 
-        const handleNextQuestion = () => {
+        const toggleUI = (enable) => {
+            const isSubmitButton = appState.currentPage === surveyQuestions.length - 1;
+            nextButton.disabled = !enable;
+            nextButton.innerHTML = enable 
+                ? (isSubmitButton ? 'Submit Survey' : 'Next')
+                : `<div class="spinner"></div>`;
+            backButton.disabled = !enable;
+            surveyContent.classList.toggle('pointer-events-none', !enable);
+            surveyContent.classList.toggle('opacity-50', !enable);
+        };
+
+        const handleNextQuestion = async () => {
             if (validatePage()) {
+                toggleUI(false);
                 if (appState.currentPage < surveyQuestions.length - 1) {
                     appState.currentPage++;
                     renderPage(appState.currentPage);
+                    toggleUI(true);
                 } else {
-                    submitSurveyAndHandleCompletion();
+                    await submitSurveyAndHandleCompletion();
+                    toggleUI(true);
                 }
             }
         };
@@ -891,36 +858,38 @@
             const submissions = getStoredSubmissions();
             if (submissions.length === 0) {
                 log("No offline submissions to sync.");
+                showTemporaryMessage("No data to sync.");
                 return;
             }
 
-            showTemporaryMessage(`Syncing ${submissions.length} offline submissions...`);
-            const successfullySyncedIds = [];
-            let networkErrorOccurred = false;
+            if (!navigator.onLine) {
+                showTemporaryMessage('No internet connection. Sync will resume later.', 'error');
+                return;
+            }
 
-            for (const submission of submissions) {
+            let successfullySyncedCount = 0;
+            let totalSubmissions = submissions.length;
+            const successfullySyncedIds = [];
+            
+            for (let i = 0; i < totalSubmissions; i++) {
+                const submission = submissions[i];
+                showTemporaryMessage(`Syncing ${i + 1} of ${totalSubmissions} submissions...`);
                 try {
                     await submitSurveyAPI(submission);
                     successfullySyncedIds.push(submission.id);
                     log(`Successfully synced submission ID: ${submission.id}`);
+                    successfullySyncedCount++;
                 } catch (error) {
-                    if (error.message.includes('HTTP error')) {
-                        log(`Server error for submission ID: ${submission.id}. Retrying later.`, error);
-                    } else {
-                        log(`Network error for submission ID: ${submission.id}. Sync will resume on next attempt.`, error);
-                        networkErrorOccurred = true;
-                        break;
-                    }
+                    log(`Sync failed for submission ID: ${submission.id}. Remaining submissions will be synced later.`, error);
+                    break; 
                 }
             }
 
             if (successfullySyncedIds.length > 0) {
                 removeSyncedSubmissions(successfullySyncedIds);
-                showTemporaryMessage(`Synced ${successfullySyncedIds.length} submissions.`, 'success');
-            }
-
-            if (networkErrorOccurred) {
-                showTemporaryMessage('Sync failed. Please check connection.', 'error');
+                showTemporaryMessage(`Synced ${successfullySyncedCount} submissions.`, 'success');
+            } else {
+                showTemporaryMessage('Sync failed. Please check connection or API.', 'error');
             }
         };
 
@@ -959,15 +928,8 @@
                 timestamp: new Date().toISOString(),
                 data: appState.formData
             };
-            await storeSubmission(submission);
-            
-            try {
-                await syncData();
-            } catch (error) {
-                log("Data sync failed during submission, but will retry later.", error);
-            } finally {
-                showCompletionScreen();
-            }
+            storeSubmission(submission);
+            showCompletionScreen();
         };
 
         const showCompletionScreen = () => {
@@ -977,11 +939,11 @@
                         <div class="checkmark-icon">✓</div>
                     </div>
                     <h2 class="text-2xl font-bold text-gray-800 mt-6">Thank You!</h2>
-                    <p class="text-gray-600 mt-2">Your feedback has been submitted successfully.</p>
+                    <p class="text-gray-600 mt-2">Your feedback has been saved locally.</p>
                 </div>
             `;
             setTimeout(() => {
-                resetSurvey();
+                window.location.reload();
             }, config.resetTime);
         };
 
@@ -1014,6 +976,20 @@
                 }
             }
         };
+
+        const scheduleDailySync = () => {
+            log("Scheduling daily sync.");
+            setInterval(() => {
+                const now = new Date();
+                // Check if it's 7 PM and we haven't synced today
+                if (now.getHours() === 19 && (lastSyncDate === null || now.getDate() !== lastSyncDate.getDate())) {
+                    log("Daily sync triggered.");
+                    lastSyncDate = now;
+                    syncData();
+                }
+            }, 60 * 60 * 1000); // Check every hour
+        };
+
 
         // --- Event Handlers ---
         nextButton.addEventListener('click', (e) => {
@@ -1059,7 +1035,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             renderPage(appState.currentPage);
             handleUserActivity();
-            syncData();
+            scheduleDailySync();
         });
     </script>
 </body>
