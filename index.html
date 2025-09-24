@@ -3,186 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Feedback Survey</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <title>Sewa International Kiosk Survey</title>
+    <link rel="icon" href="/favicon.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        :root {
+            --sewa-orange: #ff6600;
+            --sewa-blue: #004d99;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Roboto', sans-serif;
+            background-color: #f0f4f8; /* Light gray-blue background */
+            color: #333;
         }
         
-        .emoji-radio-group input[type="radio"]:checked + label,
-        .number-scale-group input[type="radio"]:checked + label {
-            transform: scale(1.1);
-            box-shadow: 0 4px 14px rgba(0,0,0,0.1);
-            border-color: #3b82f6;
-        }
-        
-        .star-rating input[type="radio"] {
-            display: none;
-        }
-        .star-rating label.star {
-            cursor: pointer;
-            color: #d1d5db;
-            transition: color 0.2s ease, transform 0.2s ease;
-        }
-        .star-rating input[type="radio"]:checked ~ label.star,
-        .star-rating:hover input[type="radio"]:checked ~ label.star {
-            color: #f59e0b;
-        }
-        .star-rating label.star:hover,
-        .star-rating label.star:hover ~ label.star,
-        .star-rating input[type="radio"]:checked ~ label.star:hover {
-            color: #fcd34d;
-        }
-        
-        #syncButton.hidden, #adminClearButton.hidden {
-            display: none;
-        }
-        
-        .checkmark-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            text-align: center;
-            animation: fadeIn 0.5s ease-in-out;
-        }
-        .checkmark-circle {
-            background-color: #22c55e;
-            border-radius: 50%;
-            width: 100px;
-            height: 100px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transform: scale(0);
-            animation: bounceIn 0.8s forwards;
-            animation-delay: 0.2s;
-        }
-        .checkmark-icon {
-            color: white;
-            font-size: 64px;
-            font-weight: bold;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes bounceIn {
-            0% { transform: scale(0); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-        .sync-loading {
-            animation: pulse 1.5s infinite;
-        }
-
-        .location-radio-group input[type="radio"]:checked + label {
-            border-color: #3b82f6;
-            background-color: #e2e8f0;
-        }
-
-        /* Visually hidden class for accessibility */
+        /* Custom Styles for Survey Elements */
         .visually-hidden {
             position: absolute;
             width: 1px;
             height: 1px;
-            padding: 0;
             margin: -1px;
+            padding: 0;
             overflow: hidden;
             clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border-width: 0;
+            border: 0;
         }
+
+        .emoji-radio-group input:checked + label,
+        .number-scale-group input:checked + label {
+            border-color: var(--sewa-orange);
+            background-color: #fff;
+            transform: scale(1.1);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            color: var(--sewa-orange);
+        }
+
+        .emoji-radio-group label,
+        .number-scale-group label,
+        .location-radio-group label,
+        .star-rating label {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+
+        .star-rating input {
+            display: none;
+        }
+
+        .star-rating label {
+            color: #d1d5db; /* Gray star */
+            font-size: 3rem;
+        }
+
+        .star-rating input:checked ~ label {
+            color: #ffc107; /* Gold star */
+        }
+
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #ffc107;
+        }
+        
+        .location-radio-group input:checked + label {
+            background-color: var(--sewa-orange);
+            color: white;
+            border-color: var(--sewa-orange);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
         .hidden-fields {
-            max-height: 0;
+            opacity: 0;
+            height: 0;
+            pointer-events: none;
             overflow: hidden;
-            transition: max-height 0.5s ease-out;
+            transition: opacity 0.3s ease-in-out, height 0.3s ease-in-out;
         }
+
         .visible-fields {
-            max-height: 500px; /* Large enough to accommodate the fields */
-            transition: max-height 0.5s ease-in;
+            opacity: 1;
+            height: auto;
+            pointer-events: auto;
         }
-        .has-error {
-            border-color: #ef4444; /* red-500 */
+        
+        .loading-bar-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 999px;
+            height: 12px;
+            overflow: hidden;
         }
+
+        .loading-bar {
+            height: 100%;
+            background-color: var(--sewa-blue);
+            border-radius: 999px;
+            transition: width 0.3s ease-in-out;
+        }
+
         .error-message {
-            color: #ef4444; /* red-500 */
+            color: #dc2626; /* Red-700 */
             font-size: 0.875rem; /* text-sm */
             margin-top: 0.25rem; /* mt-1 */
+            display: block;
         }
-        .overlay {
-            position: fixed;
+        
+        .has-error {
+            border-color: #dc2626 !important;
+            box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
+        }
+        
+        /* Auto-submit Overlay */
+        #overlay {
+            position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.7);
-            z-index: 10;
-            display: none;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
-            text-align: center;
-            font-weight: bold;
             opacity: 0;
+            visibility: hidden;
             transition: opacity 0.5s ease;
-            flex-direction: column; /* Add flex-direction to stack content */
+            z-index: 50;
         }
-        .overlay.visible {
+        
+        #overlay.visible {
             opacity: 1;
+            visibility: visible;
+        }
+
+        #cancelButton {
+            background-color: #ef4444; /* Red-500 */
+            color: white;
+        }
+        #cancelButton:hover {
+            background-color: #dc2626; /* Red-600 */
+        }
+        
+        /* Thank You Screen */
+        .checkmark-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .checkmark-circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background-color: #22c55e; /* Green-500 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
+        }
+
+        .checkmark-icon {
+            color: white;
+            font-size: 4rem;
+            font-weight: bold;
+        }
+        
+        @keyframes bounceIn {
+            0% { transform: scale(0); opacity: 0; }
+            60% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
-    <div id="overlay" class="overlay" role="status" aria-live="polite">
-        <p id="overlayMessage">Survey auto-submitting in <span id="countdown">5</span> seconds...</p>
-        <button id="cancelButton" class="mt-4 px-6 py-2 bg-red-500 text-white rounded-lg shadow-md hover:bg-red-600 transition-colors hidden" aria-label="Cancel auto-submit countdown">
-            Cancel
-        </button>
-    </div>
-
-    <div class="w-full max-w-lg mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl relative">
-        <h1 id="mainTitle" class="text-3xl font-bold text-center text-gray-800 mb-2 cursor-pointer">Customer Feedback</h1>
-        <p class="text-center text-gray-500 mb-6">We'd love to hear about your experience.</p>
-        
-        <button id="syncButton" class="hidden absolute top-4 right-4 text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600 rounded-lg shadow-md px-4 py-2 transition-colors duration-200">
-            Sync Data
-        </button>
-        <button id="adminClearButton" class="hidden absolute top-4 left-4 text-white text-xs font-semibold bg-red-500 hover:bg-red-600 rounded-lg shadow-md px-2 py-1 transition-colors duration-200">
-            Clear Queue
-        </button>
-
-        <div id="statusMessage" class="hidden text-sm" aria-live="polite"></div>
-
-        <div id="surveyContent">
-            <div id="progressBarContainer" class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
-                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" style="width: 0%;"></div>
+<body class="min-h-screen flex items-center justify-center p-4 sm:p-8">
+    <main class="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden min-h-[500px] flex flex-col">
+        <header class="bg-gray-50 border-b border-gray-200 py-4 px-6 flex justify-between items-center relative">
+            <h1 id="mainTitle" class="text-xl font-bold text-gray-800 cursor-pointer">Sewa International</h1>
+            <div class="absolute inset-x-0 bottom-0">
+                <div id="progressBarContainer" class="loading-bar-container">
+                    <div id="progressBar" class="loading-bar" style="width: 0;"></div>
+                </div>
             </div>
+            <div class="flex items-center space-x-2">
+                <button id="syncButton" class="hidden px-3 py-1 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors">Sync Data</button>
+                <button id="adminClearButton" class="hidden px-3 py-1 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors">Clear</button>
+            </div>
+        </header>
 
-            <form id="surveyForm" class="space-y-6">
-                <div id="questionContainer"></div>
-                
-                <div id="survey-navigation" class="flex justify-between items-center mt-6">
-                    <button id="backButton" type="button" class="px-6 py-3 text-gray-600 font-bold bg-gray-200 rounded-lg shadow-md hover:bg-gray-300 focus:outline-none focus:ring-4 focus:ring-gray-400 focus:ring-opacity-50 transition-colors" style="visibility: hidden;">
-                        Back
-                    </button>
-                    <button id="nextButton" type="button" class="px-6 py-3 text-white font-bold bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transition-colors">
-                        Next
-                    </button>
+        <section id="surveyContent" class="p-6 sm:p-8 flex-1 flex flex-col justify-center">
+            <div id="statusMessage" class="hidden"></div>
+            <form id="surveyForm" class="space-y-6 flex-1 flex flex-col">
+                <div id="questionContainer" class="flex-1 flex flex-col justify-center">
+                    </div>
+                <div class="flex justify-between items-center pt-4">
+                    <button id="backButton" type="button" class="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl shadow hover:bg-gray-300 transition-colors">Back</button>
+                    <button id="nextButton" type="button" class="px-6 py-3 bg-orange-500 text-white font-bold rounded-xl shadow hover:bg-orange-600 transition-colors">Next</button>
                 </div>
             </form>
+        </section>
+        
+        <div id="overlay">
+            <div class="p-8 bg-white rounded-lg shadow-xl text-center">
+                <p id="overlayMessage" class="text-xl font-bold mb-4">Survey auto-submitting in <span id="countdown">5</span> seconds...</p>
+                <button id="cancelButton" class="px-6 py-2 rounded-lg font-medium hidden">Cancel</button>
+            </div>
         </div>
-    </div>
+    </main>
 
     <script>
         // --- DOM Elements & Configuration ---
@@ -274,7 +302,7 @@
                 options: [
                     { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
                     { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
-                    { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside Atlanta)' },
+                    { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside GA)' },
                     { value: 'United States (outside GA)', label: 'United States (outside GA)' },
                     { value: 'Canada', label: 'Canada' },
                     { value: 'India', label: 'India' },
@@ -316,7 +344,7 @@
             questionRotationIndex: 0,
             typingTimeout: null,
             displayTimeout: null,
-            inactivityTimeout: null, 
+            inactivityTimeout: null,
             countdownInterval: null,
             isUserActive: false,
             debounceTimer: null,
@@ -729,6 +757,19 @@
                 emailInput.value = ''; // Clear the email value if the field is hidden
             }
         };
+        
+        // --- Logic to handle auto-advancing the survey ---
+        const handleNextQuestion = () => {
+            if (validatePage()) {
+                if (appState.currentPage < surveyQuestions.length - 1) {
+                    appState.currentPage++;
+                    renderPage(appState.currentPage);
+                } else {
+                    submitSurvey();
+                }
+            }
+        };
+        // --- End of New Logic ---
 
         const setupEventListeners = () => {
             const questionData = surveyQuestions[appState.currentPage];
@@ -760,18 +801,22 @@
                 const otherRadio = document.getElementById('locationOther');
                 const otherLocationContainer = document.getElementById('other-location-container');
                 const allRadios = document.querySelectorAll('input[name="location"]');
-                if (otherRadio) {
-                    allRadios.forEach(radio => {
-                        radio.addEventListener('change', () => {
-                            if (otherRadio.checked) {
-                                otherLocationContainer.classList.remove('hidden');
-                            } else {
-                                otherLocationContainer.classList.add('hidden');
-                            }
-                            debouncedValidate();
-                        });
+                
+                // Handle radio changes for both auto-advance and 'Other' option
+                allRadios.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        debouncedValidate(); // Always validate on change
+                        if (radio.value === 'Other') {
+                            otherLocationContainer.classList.remove('hidden');
+                            nextButton.style.display = 'block';
+                        } else {
+                            otherLocationContainer.classList.add('hidden');
+                            const otherInput = otherLocationContainer.querySelector('input');
+                            if (otherInput) otherInput.value = '';
+                            handleNextQuestion();
+                        }
                     });
-                }
+                });
             } else if (questionData.type === 'custom-contact') {
                 const newsletterCheckbox = document.getElementById('newsletterConsent');
                 if (newsletterCheckbox) {
@@ -785,7 +830,18 @@
                     toggleEmailFieldVisibility(newsletterCheckbox.checked);
                 }
             }
-            
+            // --- New Logic: Auto-advance for single-choice questions ---
+            else if (['emoji-radio', 'number-scale', 'star-rating', 'radio'].includes(questionData.type)) {
+                const radioButtons = questionContainer.querySelectorAll('input[type="radio"]');
+                radioButtons.forEach(radio => {
+                    radio.addEventListener('change', () => {
+                        debouncedValidate();
+                        handleNextQuestion();
+                    });
+                });
+            }
+            // --- End of New Logic ---
+
             // Reattach activity and validation listeners for all inputs on the page
             inputs.forEach(input => {
                 input.addEventListener('input', debouncedHandleActivity);
@@ -911,14 +967,7 @@
         // --- Event Handlers ---
         nextButton.addEventListener('click', (e) => {
             e.preventDefault();
-            if (validatePage()) {
-                if (appState.currentPage < surveyQuestions.length - 1) {
-                    appState.currentPage++;
-                    renderPage(appState.currentPage);
-                } else {
-                    submitSurvey();
-                }
-            }
+            handleNextQuestion();
         });
 
         backButton.addEventListener('click', (e) => {
