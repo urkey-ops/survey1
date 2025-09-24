@@ -631,5 +631,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initialization ---
     renderPage(appState.currentPage);
     handleUserActivity();
-    setInterval(syncData, 5 * 60 * 1000); // Attempt to sync every 5 minutes
+    setInterval(syncData, 120 * 60 * 1000); // Attempt to sync every 5 minutes
 });
