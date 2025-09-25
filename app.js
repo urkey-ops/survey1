@@ -327,7 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             handleNextQuestion();
                         }
                     });
-                });
+                }
             }
         },
         'radio': {
@@ -416,10 +416,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handle page-specific UI states
         if (pageIndex === 0) {
-            // backButton.style.visibility = 'hidden'; // 🛑 REMOVED to keep button visible
+            // backButton.style.visibility = 'hidden'; // 🛑 PREVIOUSLY REMOVED
             if (!appState.isUserActive) startQuestionRotation();
         } else {
-            // backButton.style.visibility = 'visible'; // 🛑 REMOVED to keep button visible (default)
+            // backButton.style.visibility = 'visible'; // 🛑 PREVIOUSLY REMOVED
             stopQuestionRotation();
         }
 
@@ -626,7 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // VISUAL CHANGE: Replaced .hidden with Tailwind opacity/visibility classes
         overlay.classList.remove('opacity-100', 'visible');
         overlay.classList.add('opacity-0', 'invisible');
-        
+
         updateProgressBar(true); // Set progress to 100% on completion
 
         // VISUAL CHANGE: Updated inline HTML with Tailwind utility classes
@@ -665,6 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleUI(true);
     };
 
+   
    
     // --- Admin Control Logic ---
     const hideAdminControls = () => {
