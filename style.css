@@ -147,3 +147,10 @@ input:focus, textarea:focus, button:focus, label:focus {
     outline: 2px solid var(--sewa-orange);
     outline-offset: 2px;
 }
+
+/* Add this to the very bottom of your style.css as a fix */
+#nextButton, #backButton {
+    /* Ensure no other style can hide it */
+    visibility: visible !important; 
+    opacity: 1 !important;
+}
