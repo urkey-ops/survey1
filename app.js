@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainTitle = document.getElementById('mainTitle');
     const nextButton = document.getElementById('nextButton');
     const backButton = document.getElementById('backButton');
+    const buttonContainer = document.getElementById('buttonContainer'); // NEW REFERENCE
     const questionContainer = document.getElementById('questionContainer');
     const surveyContent = document.getElementById('surveyContent');
     const overlay = document.getElementById('overlay');
@@ -96,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'India', label: 'India' },
                 { value: 'Other', label: 'Other' }
             ],
-            required: false
+            required: false // NOTE: This is optional, so clicking next without answer is allowed
         },
         {
             id: 'age',
@@ -109,14 +110,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: '40-65', label: '40-65' },
                 { value: '65+' },
             ],
-            required: false
+            required: false // NOTE: This is optional, so clicking next without answer is allowed
         },
         {
             id: 'contact',
             name: 'contact',
             type: 'custom-contact',
             question: 'Help us stay in touch.',
-            required: false,
+            required: false, // NOTE: This is optional, so clicking next without answer is allowed
             fields: [
                 { id: 'name', name: 'name', label: 'Name', type: 'text', placeholder: 'Enter your name' },
                 { id: 'newsletterConsent', name: 'newsletterConsent', label: 'Yes, I want to subscribe to updates', type: 'checkbox', placeholder: '' },
@@ -240,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
         typeWriter(currentQuestion, 0);
     };
 
-    // --- Modular Question Rendering & Event Handling ---
+    // --- Modular Question Rendering & Event Handling (Unchanged) ---
     const questionRenderers = {
         'textarea': {
             render: (q, data) => `
@@ -386,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- Survey Page Logic ---
+    // --- Survey Page Logic (Unchanged) ---
     const renderPage = (pageIndex) => {
         const questionData = surveyQuestions[pageIndex];
         if (!questionData) return;
@@ -428,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
     };
 
-    // --- Validation Logic (Modified) ---
+    // --- Validation Logic (Final Fixes confirmed) ---
     const clearValidationErrors = () => {
         questionContainer.querySelectorAll('.error-message').forEach(span => span.classList.add('hidden'));
         questionContainer.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
@@ -459,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const value = appState.formData[questionData.name]; // Get the value for the current question
 
-        // 1. Main Required Field Check (NULL-SAFE FIX IMPLEMENTED HERE)
+        // 1. Main Required Field Check (NULL-SAFE FIX)
         if (questionData.required) {
             // Check if value is falsy (undefined, null, '') OR if the trimmed string is empty.
             if (!value || (typeof value === 'string' && value.trim() === '')) {
@@ -616,7 +617,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- UI State Management (Modified for visibility) ---
+    // --- UI State Management (Final Fix) ---
     const toggleUI = (enable) => {
         const isSubmitButton = appState.currentPage === surveyQuestions.length - 1;
         nextButton.disabled = !enable;
@@ -646,11 +647,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="text-gray-600 mt-2">Your feedback has been saved.</p>
             </div>`;
         
-        // BUG FIX 2 (REVISED): Enforce visibility and disable interaction.
+        // CRITICAL VISIBILITY FIX: Enforce the display state of the button container and disable the buttons.
+        buttonContainer.style.display = 'flex'; 
         nextButton.disabled = true;
         backButton.disabled = true;
-        nextButton.style.display = 'block';
-        backButton.style.display = 'block';
 
         setTimeout(resetSurvey, config.resetTime);
     };
@@ -671,17 +671,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         form.reset();
         
-        // BUG FIX 2 (REVISED): Restore buttons visibility and state.
+        // CRITICAL VISIBILITY FIX: Re-enable the buttons and ensure container is visible.
+        buttonContainer.style.display = 'flex'; 
         nextButton.disabled = false;
         backButton.disabled = false;
-        nextButton.style.display = 'block';
-        backButton.style.display = 'block';
         
         renderPage(appState.currentPage);
         toggleUI(true);
     };
 
-    // --- Admin Control Logic (Unchanged) ---
+    // --- Admin Control Logic and Event Handlers (Unchanged) ---
     const hideAdminControls = () => {
         syncButton.classList.add('hidden');
         adminClearButton.classList.add('hidden');
@@ -689,7 +688,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showTemporaryMessage("Admin controls hidden.", "info");
     };
 
-    // --- Event Handlers (Unchanged) ---
     nextButton.addEventListener('click', (e) => {
         e.preventDefault();
         handleNextQuestion();
