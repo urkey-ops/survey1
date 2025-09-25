@@ -187,9 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isUserActive = true; // Mark user as active
     };
 
-    const handleInactivityTimeout = () => {
+  const handleInactivityTimeout = () => {
         log("Inactivity timer expired.");
-        if (Object.keys(appState.formData).length > 0) {
+        // --- NEW LOGIC: Only auto-submit if there is actually data. ---
+        if (Object.keys(appState.formData).length > 0) { 
             log("User inactive with partial data. Triggering auto-submit countdown.");
             autoSubmitSurvey();
         } else {
