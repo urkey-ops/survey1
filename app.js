@@ -248,10 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
         'textarea': {
-            render: (q, data) => `
-                <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
-                <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
-                <span id="${q.id}Error" class="error-message hidden"></span>`,
+    render: (q, data) => `
+        <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
+        <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
+        <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
                 // Listen for any form of input to signal user activity
