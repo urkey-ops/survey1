@@ -148,9 +148,8 @@ input:focus, textarea:focus, button:focus, label:focus {
     outline-offset: 2px;
 }
 
-/* Add this to the very bottom of your style.css as a fix */
-#nextButton, #backButton {
-    /* Ensure no other style can hide it */
+/* CRITICAL FIX: Ensure button container and buttons are always visible on the UI layer */
+#buttonContainer, #nextButton, #backButton {
     visibility: visible !important; 
     opacity: 1 !important;
 }
