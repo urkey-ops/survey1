@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', () => {
         inactivityTime: 30000,
         autoSubmitCountdown: 5,
         debounceDelay: 200,
-        cacheDuration: 60 * 60 * 1000 // 1 hour in milliseconds
     };
 
     const API_ENDPOINT = '/api/submit-survey';
@@ -139,7 +138,6 @@ document.addEventListener('DOMContentLoaded', () => {
         adminClickCount: 0,
         adminTimer: null,
         stopRotationPermanently: false,
-        stopTypingInstantly: false,
         syncIntervalId: null,
     };
 
@@ -187,6 +185,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
         appState.isUserActive = true; // Mark user as active
+        if (appState.currentPage === 0) {
+            stopQuestionRotation(); // Stop rotation as soon as the user interacts
+        }
     };
 
     const handleInactivityTimeout = () => {
@@ -199,8 +200,8 @@ document.addEventListener('DOMContentLoaded', () => {
             resetSurvey();
         }
     };
-    
-    // --- Corrected Rotation Logic ---
+
+    // --- Question Rotation Logic ---
     const startQuestionRotation = () => {
         if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
         rotateQuestions();
@@ -215,20 +216,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const questionElement = questionContainer.querySelector('#rotatingQuestion');
         if (!questionElement) return;
 
-        // The logic to finish the sentence instantly has been removed to allow it to complete naturally.
         if (i < text.length) {
             questionElement.textContent += text.charAt(i);
             appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
         } else {
-            // Once typing is complete, check if user is active.
             if (!appState.isUserActive) {
                 appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
             }
         }
     };
-    
+
     const rotateQuestions = () => {
-        // This check correctly stops the rotation from starting
         if (appState.stopRotationPermanently) return;
         const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
         if (!rotatingQuestionEl) return;
@@ -240,14 +238,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
         typeWriter(currentQuestion, 0);
     };
-    
-    // NEW: Function to stop rotation gracefully
-    const handleInputStart = () => {
-        // This flag stops future rotations from starting
-        appState.stopRotationPermanently = true; 
-        // This clears the timeout for the *next* rotation, but allows the current typing to finish
-        clearTimeout(appState.displayTimeout);
-    };
 
     // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
@@ -258,10 +248,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
-                // Listen for any form of input to signal user activity
-                textarea.addEventListener('input', resetInactivityTimer);
-                textarea.addEventListener('focus', handleInputStart);
-                textarea.addEventListener('blur', resetInactivityTimer);
+                textarea.addEventListener('focus', () => stopQuestionRotation());
+                textarea.addEventListener('blur', () => !appState.stopRotationPermanently && startQuestionRotation());
             }
         },
         'emoji-radio': {
@@ -278,13 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        handleInputStart();
-                        resetInactivityTimer();
-                        handleNextQuestion();
-                    });
-                });
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
             }
         },
         'number-scale': {
@@ -299,13 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex justify-between text-sm mt-2 text-gray-500"><span>${q.labels.min}</span><span>${q.labels.max}</span></div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        handleInputStart();
-                        resetInactivityTimer();
-                        handleNextQuestion();
-                    });
-                });
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
             }
         },
         'star-rating': {
@@ -319,13 +295,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        handleInputStart();
-                        resetInactivityTimer();
-                        handleNextQuestion();
-                    });
-                });
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
             }
         },
         'radio-with-other': {
@@ -345,8 +315,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setupEvents: (q, { handleNextQuestion }) => {
                 document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
                     radio.addEventListener('change', (e) => {
-                        handleInputStart();
-                        resetInactivityTimer();
                         const otherContainer = document.getElementById('other-location-container');
                         if (e.target.value === 'Other') {
                             otherContainer.classList.remove('hidden');
@@ -370,13 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        handleInputStart();
-                        resetInactivityTimer();
-                        handleNextQuestion();
-                    });
-                });
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
             }
         },
         'custom-contact': {
@@ -403,8 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
             setupEvents: () => {
                 const checkbox = document.getElementById('newsletterConsent');
                 checkbox.addEventListener('change', (e) => {
-                    handleInputStart();
-                    resetInactivityTimer();
                     const emailContainer = document.getElementById('email-field-container');
                     const emailInput = document.getElementById('email');
                     if (e.target.checked) {
@@ -418,8 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         emailInput.value = '';
                     }
                 });
-                document.getElementById('name').addEventListener('input', resetInactivityTimer);
-                document.getElementById('email').addEventListener('input', resetInactivityTimer);
             }
         }
     };
@@ -438,20 +396,28 @@ document.addEventListener('DOMContentLoaded', () => {
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
 
+        // General and specific event listeners
+        const allInputs = questionContainer.querySelectorAll('input, textarea');
+        allInputs.forEach(input => {
+            input.addEventListener('input', resetInactivityTimer);
+            input.addEventListener('change', resetInactivityTimer);
+        });
+
         renderer.setupEvents(questionData, { handleNextQuestion });
 
+        // Auto-focus on the first interactive element for better a11y and UX
         const firstInput = questionContainer.querySelector('input:not([type="hidden"]), textarea');
         if (firstInput) {
             firstInput.focus();
         }
 
+        // Handle page-specific UI states
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
             if (!appState.isUserActive) startQuestionRotation();
         } else {
             backButton.style.visibility = 'visible';
-            // Explicitly stop rotation if not on the first page
-            appState.stopRotationPermanently = true;
+            stopQuestionRotation();
         }
 
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
@@ -481,6 +447,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const questionData = surveyQuestions[appState.currentPage];
         let isValid = true;
 
+        // Update formData from the current page's form elements
         const currentData = Object.fromEntries(new FormData(form));
         Object.assign(appState.formData, currentData);
         log("Updated appState.formData:", appState.formData);
@@ -589,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     };
 
+    // --- NEW CONCURRENT SYNC LOGIC ---
     const syncData = async () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
@@ -603,6 +571,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showTemporaryMessage(`Syncing ${submissions.length} submissions...`);
 
+        // Use Promise.all to handle all requests concurrently
         const syncPromises = submissions.map(async (submission) => {
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -641,6 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showCompletionScreen = () => {
+        // Hide the overlay if it was shown for auto-submit
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -664,8 +634,8 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.formData = {};
         appState.isUserActive = false;
         appState.stopRotationPermanently = false;
-        appState.stopTypingInstantly = false; // Reset the new flag
 
+        // Hide the overlay on every reset
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -683,97 +653,65 @@ document.addEventListener('DOMContentLoaded', () => {
     const hideAdminControls = () => {
         syncButton.classList.add('hidden');
         adminClearButton.classList.add('hidden');
+        hideAdminButton.classList.add('hidden');
+        showTemporaryMessage("Admin controls hidden.", "info");
     };
 
-    const toggleAdminControls = () => {
-        syncButton.classList.remove('hidden');
-        adminClearButton.classList.remove('hidden');
-        hideAdminButton.classList.remove('hidden');
-        showTemporaryMessage('Admin controls unlocked.', 'info');
-    };
+    // --- Event Handlers ---
+    nextButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleNextQuestion();
+    });
 
-    const checkAdminAccess = () => {
-        if (!appState.adminTimer) {
-            appState.adminTimer = setTimeout(() => {
-                appState.adminClickCount = 0;
-                appState.adminTimer = null;
-                log("Admin click count reset.");
-            }, config.adminClickTimeout);
+    backButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (appState.currentPage > 0) {
+            appState.currentPage--;
+            renderPage(appState.currentPage);
         }
+    });
+
+    mainTitle.addEventListener('click', () => {
         appState.adminClickCount++;
-        log(`Admin clicks: ${appState.adminClickCount}`);
-        if (appState.adminClickCount >= config.adminClicksRequired) {
-            clearTimeout(appState.adminTimer);
+        clearTimeout(appState.adminTimer);
+        appState.adminTimer = setTimeout(() => appState.adminClickCount = 0, config.adminClickTimeout);
+
+        if (appState.adminClickCount === config.adminClicksRequired) {
+            log("Admin mode activated!");
+            showTemporaryMessage("Admin mode activated.");
+            syncButton.classList.remove('hidden');
+            adminClearButton.classList.remove('hidden');
+            hideAdminButton.classList.remove('hidden');
             appState.adminClickCount = 0;
-            appState.adminTimer = null;
-            toggleAdminControls();
         }
-    };
+    });
 
-    // --- Initializations & Event Listeners ---
-    const setupEventListeners = () => {
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            handleNextQuestion();
-        });
+    cancelButton.addEventListener('click', () => {
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+        }
+        overlay.classList.add('hidden');
+        resetInactivityTimer();
+    });
 
-        nextButton.addEventListener('click', debounce(handleNextQuestion, config.debounceDelay));
-        backButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (appState.currentPage > 0) {
-                appState.currentPage--;
-                renderPage(appState.currentPage);
-            }
-        });
-        cancelButton.addEventListener('click', () => {
-            log("Countdown canceled. Resetting survey.");
-            if (appState.countdownIntervalId) {
-                clearInterval(appState.countdownIntervalId);
-                appState.countdownIntervalId = null;
-            }
-            overlay.classList.add('hidden');
-            resetSurvey();
-        });
-
-        // Click on title to reveal admin controls
-        mainTitle.addEventListener('click', checkAdminAccess);
-
-        // Admin functionality
-        syncButton.addEventListener('click', syncData);
-        adminClearButton.addEventListener('click', () => {
+    syncButton.addEventListener('click', async () => {
+        await syncData();
+    });
+    
+    adminClearButton.addEventListener('click', () => {
+        if(confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
-            showTemporaryMessage('All locally saved data cleared!', 'success');
-        });
-        hideAdminButton.addEventListener('click', hideAdminControls);
-
-        // Reset inactivity timer on any user interaction
-        ['click', 'mousemove', 'keydown', 'scroll'].forEach(event => {
-            document.addEventListener(event, resetInactivityTimer, { passive: true });
-        });
-
-        // Sync data every hour and on page load
-        // NEW: Implement caching to prevent constant API calls on reload
-        const lastSyncTimestamp = localStorage.getItem('lastSyncTimestamp');
-        const now = new Date().getTime();
-
-        if (!lastSyncTimestamp || (now - lastSyncTimestamp > config.cacheDuration)) {
-            syncData().then(() => {
-                localStorage.setItem('lastSyncTimestamp', new Date().getTime());
-            });
-        } else {
-            showTemporaryMessage('Using cached data.', 'info');
+            showTemporaryMessage("All local submissions cleared.", "success");
         }
+    });
 
-        appState.syncIntervalId = setInterval(() => {
-            syncData().then(() => {
-                localStorage.setItem('lastSyncTimestamp', new Date().getTime());
-            });
-        }, config.cacheDuration);
+    hideAdminButton.addEventListener('click', hideAdminControls);
 
-        // Handle offline/online events for syncing
-        window.addEventListener('online', syncData);
-    };
+    // Initial render and setup
+    renderPage(appState.currentPage);
+    resetInactivityTimer();
 
-    setupEventListeners();
-    resetSurvey();
+    // Start a periodic sync check for when the device comes back online
+    appState.syncIntervalId = setInterval(syncData, 60000); // Check every minute
 });
