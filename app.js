@@ -186,7 +186,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
         appState.isUserActive = true; // Mark user as active
-        // REMOVED: stopQuestionRotation() call for Q1. Rotation must continue.
     };
 
     const handleInactivityTimeout = () => {
@@ -250,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
-                // REMOVED: Rotation stopping/starting on focus/blur events to allow continuous rotation
             }
         },
         'emoji-radio': {
@@ -430,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
     };
 
-    // --- Validation Logic (Unchanged) ---
+    // --- Validation Logic (Modified) ---
     const clearValidationErrors = () => {
         questionContainer.querySelectorAll('.error-message').forEach(span => span.classList.add('hidden'));
         questionContainer.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
@@ -459,16 +457,24 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.assign(appState.formData, currentData);
         log("Updated appState.formData:", appState.formData);
 
-        if (questionData.required && (!appState.formData[questionData.name] || appState.formData[questionData.name].trim() === '')) {
-            isValid = false;
-            showValidationError(questionData.id, "This field is required.");
+        const value = appState.formData[questionData.name]; // Get the value for the current question
+
+        // 1. Main Required Field Check (NULL-SAFE FIX IMPLEMENTED HERE)
+        if (questionData.required) {
+            // Check if value is falsy (undefined, null, '') OR if the trimmed string is empty.
+            if (!value || (typeof value === 'string' && value.trim() === '')) {
+                isValid = false;
+                showValidationError(questionData.id, "This field is required.");
+            }
         }
 
-        if (questionData.type === 'radio-with-other' && appState.formData.location === 'Other' && !appState.formData.other_location?.trim()) {
+        // 2. Specific Validation: Location "Other" text field
+        if (questionData.type === 'radio-with-other' && value === 'Other' && !appState.formData.other_location?.trim()) {
             isValid = false;
             showValidationError('other_location_text', "Please specify your location.");
         }
 
+        // 3. Specific Validation: Contact Email (only required if consent is given)
         if (questionData.type === 'custom-contact' && appState.formData.newsletterConsent === 'Yes') {
             const email = appState.formData.email?.trim();
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -610,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- UI State Management (Modified) ---
+    // --- UI State Management (Modified for visibility) ---
     const toggleUI = (enable) => {
         const isSubmitButton = appState.currentPage === surveyQuestions.length - 1;
         nextButton.disabled = !enable;
@@ -640,9 +646,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <p class="text-gray-600 mt-2">Your feedback has been saved.</p>
             </div>`;
         
-        // BUG FIX 2: Disable buttons instead of hiding them
+        // BUG FIX 2 (REVISED): Enforce visibility and disable interaction.
         nextButton.disabled = true;
         backButton.disabled = true;
+        nextButton.style.display = 'block';
+        backButton.style.display = 'block';
 
         setTimeout(resetSurvey, config.resetTime);
     };
@@ -663,9 +671,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         form.reset();
         
-        // Restore buttons visibility and state
+        // BUG FIX 2 (REVISED): Restore buttons visibility and state.
         nextButton.disabled = false;
         backButton.disabled = false;
+        nextButton.style.display = 'block';
+        backButton.style.display = 'block';
         
         renderPage(appState.currentPage);
         toggleUI(true);
