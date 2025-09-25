@@ -187,10 +187,10 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isUserActive = true; // Mark user as active
     };
 
-  const handleInactivityTimeout = () => {
+    const handleInactivityTimeout = () => {
         log("Inactivity timer expired.");
         // --- NEW LOGIC: Only auto-submit if there is actually data. ---
-        if (Object.keys(appState.formData).length > 0) { 
+        if (Object.keys(appState.formData).length > 0) {
             log("User inactive with partial data. Triggering auto-submit countdown.");
             autoSubmitSurvey();
         } else {
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             resetSurvey();
         }
     };
-    
+
     // --- Corrected Rotation Logic ---
     const startQuestionRotation = () => {
         if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
@@ -224,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     };
-    
+
     const rotateQuestions = () => {
         if (appState.stopRotationPermanently) return;
         const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
         typeWriter(currentQuestion, 0);
     };
-    
+
     // NEW: Function to stop rotation gracefully
     const handleInputStart = () => {
         // This flag ensures no new rotation cycle will start.
@@ -248,10 +248,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
         'textarea': {
-    render: (q, data) => `
-        <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
-        <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
-        <span id="${q.id}Error" class="error-message hidden"></span>`,
+            // REMOVED THE STATIC QUESTION TEXT. Now the label is initially empty.
+            render: (q, data) => `
+                <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite"></label>
+                <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
+                <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
                 // Listen for any form of input to signal user activity
@@ -434,6 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
 
+        // This is a crucial line. It will now pass the `handleNextQuestion` function to the setupEvents function.
         renderer.setupEvents(questionData, { handleNextQuestion });
 
         const firstInput = questionContainer.querySelector('input:not([type="hidden"]), textarea');
@@ -696,47 +698,64 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // Admin access via title clicks
+    const resetAdminClicks = debounce(() => {
+        appState.adminClickCount = 0;
+        log("Admin click count reset.");
+    }, config.adminClickTimeout);
+
     mainTitle.addEventListener('click', () => {
         appState.adminClickCount++;
-        clearTimeout(appState.adminTimer);
-        appState.adminTimer = setTimeout(() => appState.adminClickCount = 0, config.adminClickTimeout);
-
-        if (appState.adminClickCount === config.adminClicksRequired) {
-            log("Admin mode activated!");
-            showTemporaryMessage("Admin mode activated.");
+        log(`Admin clicks: ${appState.adminClickCount}`);
+        if (appState.adminClickCount >= config.adminClicksRequired) {
+            log("Admin access granted!");
             syncButton.classList.remove('hidden');
             adminClearButton.classList.remove('hidden');
             hideAdminButton.classList.remove('hidden');
             appState.adminClickCount = 0;
+            clearTimeout(appState.adminTimer);
+            showTemporaryMessage("Admin controls shown.", "success");
+        } else {
+            resetAdminClicks();
         }
     });
 
+    // Sync and clear data buttons
+    syncButton.addEventListener('click', () => {
+        syncData();
+    });
+
+    adminClearButton.addEventListener('click', () => {
+        localStorage.clear();
+        log("Local storage cleared.");
+        showTemporaryMessage("All offline data cleared!", "success");
+    });
+
+    hideAdminButton.addEventListener('click', () => {
+        hideAdminControls();
+    });
+
+    // Handle user interaction for inactivity reset
+    document.body.addEventListener('mousemove', resetInactivityTimer);
+    document.body.addEventListener('keydown', resetInactivityTimer);
+    document.body.addEventListener('touchstart', resetInactivityTimer);
+
+    // Cancel auto-submit countdown
     cancelButton.addEventListener('click', () => {
-        if (appState.countdownIntervalId) {
-            clearInterval(appState.countdownIntervalId);
-            appState.countdownIntervalId = null;
-        }
+        log("Auto-submit canceled by user.");
+        clearInterval(appState.countdownIntervalId);
+        appState.countdownIntervalId = null;
         overlay.classList.add('hidden');
         resetInactivityTimer();
     });
 
-    syncButton.addEventListener('click', async () => {
-        await syncData();
-    });
-    
-    adminClearButton.addEventListener('click', () => {
-        if(confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
-            localStorage.removeItem(LOCAL_STORAGE_KEY);
-            showTemporaryMessage("All local submissions cleared.", "success");
-        }
-    });
+    // Initial page render and startup logic
+    const initialize = () => {
+        renderPage(appState.currentPage);
+        resetInactivityTimer();
+        // Start the periodic sync.
+        appState.syncIntervalId = setInterval(syncData, 5 * 60 * 1000); // Sync every 5 minutes
+    };
 
-    hideAdminButton.addEventListener('click', hideAdminControls);
-
-    // Initial render and setup
-    renderPage(appState.currentPage);
-    resetInactivityTimer();
-
-    // Start a periodic sync check for when the device comes back online
-    appState.syncIntervalId = setInterval(syncData, 60000); // Check every minute
+    initialize();
 });
