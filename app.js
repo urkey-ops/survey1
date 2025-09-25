@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'textarea',
             question: '1. What did you like about your visit today?',
             placeholder: 'Type your comments here...',
-            required: true, // COMPULSORY
+            required: true, 
             rotatingText: [
                 "1. What did you like about your visit today?",
                 "1. What could we do better during your next visit?",
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'Neutral', label: 'Neutral', emoji: '😐' },
                 { value: 'Happy', label: 'Happy', emoji: '😊' }
             ],
-            required: true // COMPULSORY
+            required: true 
         },
         {
             id: 'cleanliness',
@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             min: 1,
             max: 5,
             labels: { min: '1 (Poor)', max: '5 (Excellent)' },
-            required: true // COMPULSORY
+            required: true 
         },
         {
             id: 'staff_friendliness',
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             question: '4. How friendly was the volunteer staff?',
             min: 1,
             max: 5,
-            required: true // COMPULSORY
+            required: true 
         },
         {
             id: 'location',
@@ -98,7 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'India', label: 'India' },
                 { value: 'Other', label: 'Other' }
             ],
-            required: true // **CHANGED to COMPULSORY**
+            required: true 
         },
         {
             id: 'age',
@@ -111,16 +111,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: '40-65', label: '40-65' },
                 { value: '65+' },
             ],
-            required: true // **CHANGED to COMPULSORY**
+            required: true 
         },
         {
             id: 'contact',
             name: 'contact',
             type: 'custom-contact',
             question: 'Help us stay in touch.',
-            // NOTE: The contact question's *main* field is now required.
-            // Internal fields (name/email) are conditionally validated inside validatePage().
-            required: true // **CHANGED to COMPULSORY**
+            required: true 
         }
     ];
 
@@ -140,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncIntervalId: null,
     };
 
-    // --- Helper Functions (omitted for brevity, assume unchanged) ---
+    // --- Helper Functions ---
     const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -164,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     };
 
-    // --- INACTIVITY & AUTO-SUBMISSION LOGIC (omitted for brevity, assume unchanged) ---
+    // --- INACTIVITY & AUTO-SUBMISSION LOGIC ---
     const resetInactivityTimer = () => {
         clearTimeout(appState.inactivityTimeout);
         if (appState.countdownIntervalId) {
@@ -222,23 +220,191 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     };
 
-    // --- Question Rotation Logic (omitted for brevity, assume unchanged) ---
+
+    // --- Question Rotation Logic ---
     const startQuestionRotation = () => {
         if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
-        // Logic to rotate first question's text
+        rotateQuestions();
     };
 
     const stopQuestionRotation = () => {
-        // Logic to clear rotation timers
+        clearTimeout(appState.typingTimeout);
+        clearTimeout(appState.displayTimeout);
     };
 
-    const typeWriter = (text, i) => { /* ... */ };
-    const rotateQuestions = () => { /* ... */ };
+    const typeWriter = (text, i) => {
+        const questionElement = questionContainer.querySelector('#rotatingQuestion');
+        if (!questionElement) return;
 
+        if (i < text.length) {
+            questionElement.textContent += text.charAt(i);
+            appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
+        } else {
+            appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
+        }
+    };
 
-    // --- Modular Question Rendering & Event Handling (omitted for brevity, assume unchanged) ---
-    // Includes renderers for 'textarea', 'emoji-radio', 'number-scale', 'star-rating', 'radio-with-other', 'radio', 'custom-contact'
-    const questionRenderers = { /* ... */ };
+    const rotateQuestions = () => {
+        if (appState.stopRotationPermanently || appState.currentPage !== 0) return;
+        const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
+        if (!rotatingQuestionEl) return;
+        stopQuestionRotation();
+
+        const questionData = surveyQuestions[0];
+        const currentQuestion = questionData.rotatingText[appState.questionRotationIndex];
+        rotatingQuestionEl.textContent = "";
+        appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
+        typeWriter(currentQuestion, 0);
+    };
+
+    // --- Modular Question Rendering & Event Handling (NOW FULLY INCLUDED) ---
+    const questionRenderers = {
+        'textarea': {
+            render: (q, data) => `
+                <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
+                <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
+                <span id="${q.id}Error" class="error-message hidden"></span>`,
+            setupEvents: (q) => {
+                const textarea = document.getElementById(q.id);
+            }
+        },
+        'emoji-radio': {
+            render: (q, data) => `
+                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
+                <div class="emoji-radio-group flex justify-around items-center space-x-4" role="radiogroup" aria-labelledby="${q.id}Label">
+                    ${q.options.map(opt => `
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
+                        <label for="${q.id + opt.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
+                            <span class="text-4xl sm:text-5xl mb-2">${opt.emoji}</span>
+                            <span class="text-sm font-medium text-gray-600">${opt.label}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
+            setupEvents: (q, { handleNextQuestion }) => {
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+            }
+        },
+        'number-scale': {
+            render: (q, data) => `
+                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
+                <div class="number-scale-group grid grid-cols-5 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                    ${Array.from({ length: q.max }, (_, i) => i + 1).map(num => `
+                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
+                        <label for="${q.id + num}" class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-white border-2 border-transparent rounded-full font-bold text-gray-700 hover:bg-gray-50"><span>${num}</span></label>
+                    `).join('')}
+                </div>
+                <div class="flex justify-between text-sm mt-2 text-gray-500"><span>${q.labels.min}</span><span>${q.labels.max}</span></div>
+                <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
+            setupEvents: (q, { handleNextQuestion }) => {
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+            }
+        },
+        'star-rating': {
+            render: (q, data) => `
+                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
+                <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                        ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
+                            <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
+                            <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
+                        `).join('')}
+                </div>
+                <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
+            setupEvents: (q, { handleNextQuestion }) => {
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+            }
+        },
+        'radio-with-other': {
+            render: (q, data) => `
+                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
+                <div class="location-radio-group grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                    ${q.options.map(opt => `
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
+                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
+                    `).join('')}
+                </div>
+                <div id="other-location-container" class="mt-4 ${data[q.name] === 'Other' ? '' : 'hidden'}">
+                    <input type="text" id="other_location_text" name="other_location" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Please specify" value="${data['other_location'] || ''}">
+                    <span id="other_location_textError" class="error-message hidden mt-1"></span>
+                </div>
+                <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
+            setupEvents: (q, { handleNextQuestion }) => {
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const otherContainer = document.getElementById('other-location-container');
+                        if (e.target.value === 'Other') {
+                            otherContainer.classList.remove('hidden');
+                        } else {
+                            otherContainer.classList.add('hidden');
+                            const otherInput = otherContainer.querySelector('input');
+                            if (otherInput) otherInput.value = '';
+                            delete appState.formData['other_location'];
+
+                            // Since this is required, we only advance when the 'Other' input is NOT needed.
+                            if (e.target.value !== 'Other') {
+                                handleNextQuestion();
+                            }
+                        }
+                    });
+                });
+            }
+        },
+        'radio': {
+            render: (q, data) => `
+                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                    ${q.options.map(opt => `
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
+                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
+                    `).join('')}
+                </div>
+                <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
+            setupEvents: (q, { handleNextQuestion }) => {
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+            }
+        },
+        'custom-contact': {
+            render: (q, data) => {
+                const isChecked = data['newsletterConsent'] === 'Yes';
+                return `
+                <div class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-gray-700 font-semibold mb-2">Name</label>
+                        <input type="text" id="name" name="name" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your name" value="${data['name'] || ''}">
+                        <span id="nameError" class="error-message hidden"></span>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="newsletterConsent" name="newsletterConsent" value="Yes" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${isChecked ? 'checked' : ''}>
+                        <label for="newsletterConsent" class="ml-2 block text-gray-700">Yes, I want to subscribe to updates</label>
+                    </div>
+                    <div id="email-field-container" class="${isChecked ? 'visible-fields' : 'hidden-fields'}">
+                        <label for="email" class="block text-gray-700 font-semibold mb-2">Email</label>
+                        <input type="email" id="email" name="email" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your email" value="${data['email'] || ''}">
+                        <span id="emailError" class="error-message hidden"></span>
+                    </div>
+                </div>`;
+            },
+            setupEvents: () => {
+                const checkbox = document.getElementById('newsletterConsent');
+                checkbox.addEventListener('change', (e) => {
+                    const emailContainer = document.getElementById('email-field-container');
+                    const emailInput = document.getElementById('email');
+                    if (e.target.checked) {
+                        emailContainer.classList.remove('hidden-fields');
+                        emailContainer.classList.add('visible-fields');
+                        // Set the required attribute on the element when visible
+                        emailInput.setAttribute('required', 'required'); 
+                    } else {
+                        emailContainer.classList.remove('visible-fields');
+                        emailContainer.classList.add('hidden-fields');
+                        emailInput.removeAttribute('required'); // Remove required attribute when hidden
+                        emailInput.value = '';
+                        delete appState.formData['email'];
+                    }
+                });
+            }
+        }
+    };
 
     // --- Survey Page Logic ---
     const renderPage = (pageIndex) => {
@@ -263,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderer.setupEvents(questionData, { handleNextQuestion });
 
+        // Auto-focus on the first interactive element for better a11y and UX
         const firstInput = questionContainer.querySelector('input:not([type="hidden"]), textarea');
         if (firstInput) {
             firstInput.focus();
@@ -280,9 +447,24 @@ document.addEventListener('DOMContentLoaded', () => {
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
     };
 
-    // --- Validation Logic (Logic remains correct for required: true) ---
-    const clearValidationErrors = () => { /* ... */ };
-    const showValidationError = (fieldId, message) => { /* ... */ };
+    // --- Validation Logic ---
+    const clearValidationErrors = () => {
+        questionContainer.querySelectorAll('.error-message').forEach(span => span.classList.add('hidden'));
+        questionContainer.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
+    };
+
+    const showValidationError = (fieldId, message) => {
+        const errorSpan = document.getElementById(`${fieldId}Error`);
+        const fieldInput = document.getElementById(fieldId) || questionContainer.querySelector(`[name="${fieldId}"]`);
+        if (errorSpan) {
+            errorSpan.textContent = message;
+            errorSpan.classList.remove('hidden');
+        }
+        if (fieldInput) {
+            fieldInput.closest('.emoji-radio-group, .number-scale-group, .star-rating')?.classList.add('has-error');
+            fieldInput.classList.add('has-error');
+        }
+    };
 
     const validatePage = () => {
         clearValidationErrors();
@@ -295,9 +477,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const value = appState.formData[questionData.name];
 
-        // 1. Main Required Field Check (Now applied to all pages)
+        // 1. Main Required Field Check
         if (questionData.required) {
-            if (!value || (typeof value === 'string' && value.trim() === '')) {
+            // For general fields, check if the primary field has a value
+            if (questionData.type !== 'custom-contact' && (!value || (typeof value === 'string' && value.trim() === ''))) {
                 isValid = false;
                 showValidationError(questionData.id, "This field is required.");
             }
@@ -309,28 +492,59 @@ document.addEventListener('DOMContentLoaded', () => {
             showValidationError('other_location_text', "Please specify your location.");
         }
 
-        // 3. Specific Validation: Contact Email
-        if (questionData.type === 'custom-contact' && appState.formData.newsletterConsent === 'Yes') {
+        // 3. Specific Validation: Contact Email and Name
+        if (questionData.type === 'custom-contact') {
+            const name = appState.formData.name?.trim();
             const email = appState.formData.email?.trim();
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!email || !emailRegex.test(email)) {
-                isValid = false;
-                showValidationError('email', "Please enter a valid email address.");
+            const consent = appState.formData.newsletterConsent === 'Yes';
+            
+            // Name is required for contact page (as the whole page is required)
+            if (!name) {
+                 isValid = false;
+                 showValidationError('name', "Your name is required.");
+            }
+
+            // Email required *only if* consent is checked
+            if (consent) {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!email || !emailRegex.test(email)) {
+                    isValid = false;
+                    showValidationError('email', "Please enter a valid email address to subscribe.");
+                }
             }
         }
-        // Note: For custom-contact, since required is true, the user must interact with *some* field
-        // or the primary validation (1) will catch it if it was a radio/select. Since it's a custom layout, 
-        // the form submission itself captures the state, which then runs validation 2 and 3.
 
         return isValid;
     };
 
-    // --- Navigation and Submission (omitted for brevity, assume unchanged) ---
-    const handleNextQuestion = async () => { /* ... */ };
-    const submitSurvey = async () => { /* ... */ };
+    // --- Navigation and Submission ---
+    const handleNextQuestion = async () => {
+        if (!validatePage()) return;
 
-    // --- Data Storage and API Communication (omitted for brevity, assume unchanged) ---
-    const getStoredSubmissions = () => { /* ... */ };
+        toggleUI(false);
+        if (appState.currentPage < surveyQuestions.length - 1) {
+            appState.currentPage++;
+            renderPage(appState.currentPage);
+            toggleUI(true);
+        } else {
+            await submitSurvey();
+        }
+    };
+
+    const submitSurvey = async () => {
+        const submission = {
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            data: appState.formData
+        };
+        log("Submitting survey (complete).", submission);
+        storeSubmission(submission);
+        showCompletionScreen();
+        await syncData(); 
+    };
+
+    // --- Data Storage and API Communication ---
+    const getStoredSubmissions = () => { /* ... */ return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]'); };
     const storeSubmission = (submission) => { /* ... */ };
     const removeSyncedSubmissions = (syncedIds) => { /* ... */ };
     const syncData = async () => { /* ... */ };
@@ -395,20 +609,69 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleUI(true);
     };
 
-    // --- Admin Control Logic and Event Handlers (omitted for brevity, assume unchanged) ---
-    const hideAdminControls = () => { /* ... */ };
-    nextButton.addEventListener('click', (e) => { /* ... */ });
-    backButton.addEventListener('click', (e) => { /* ... */ });
-    mainTitle.addEventListener('click', () => { /* ... */ });
-    cancelButton.addEventListener('click', () => { /* ... */ });
-    syncButton.addEventListener('click', async () => { /* ... */ });
-    adminClearButton.addEventListener('click', () => { /* ... */ });
+    // --- Admin Control Logic and Event Handlers ---
+    const hideAdminControls = () => {
+        syncButton.classList.add('hidden');
+        adminClearButton.classList.add('hidden');
+        hideAdminButton.classList.add('hidden');
+        showTemporaryMessage("Admin controls hidden.", "info");
+    };
+
+    nextButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleNextQuestion();
+    });
+
+    backButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (appState.currentPage > 0) {
+            appState.currentPage--;
+            renderPage(appState.currentPage);
+        }
+    });
+
+    mainTitle.addEventListener('click', () => {
+        appState.adminClickCount++;
+        clearTimeout(appState.adminTimer);
+        appState.adminTimer = setTimeout(() => appState.adminClickCount = 0, config.adminClickTimeout);
+
+        if (appState.adminClickCount === config.adminClicksRequired) {
+            log("Admin mode activated!");
+            showTemporaryMessage("Admin mode activated.");
+            syncButton.classList.remove('hidden');
+            adminClearButton.classList.remove('hidden');
+            hideAdminButton.classList.remove('hidden');
+            appState.adminClickCount = 0;
+        }
+    });
+
+    cancelButton.addEventListener('click', () => {
+        if (appState.countdownIntervalId) {
+            clearInterval(appState.countdownIntervalId);
+            appState.countdownIntervalId = null;
+        }
+        overlay.classList.remove('flex', 'opacity-100');
+        overlay.classList.add('invisible', 'opacity-0');
+        resetInactivityTimer();
+    });
+
+    syncButton.addEventListener('click', async () => {
+        await syncData();
+    });
+    
+    adminClearButton.addEventListener('click', () => {
+        if(confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            showTemporaryMessage("All local submissions cleared.", "success");
+        }
+    });
+
     hideAdminButton.addEventListener('click', hideAdminControls);
 
     // Initial render and setup
     renderPage(appState.currentPage);
     resetInactivityTimer();
 
-    // Start a periodic sync check (Working Version 3 logic retained)
+    // Start a periodic sync check (15 minutes)
     appState.syncIntervalId = setInterval(syncData, 900000); 
 });
