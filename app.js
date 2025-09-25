@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'Under 18', label: 'Under 18' },
                 { value: '18-40', label: '18-40' },
                 { value: '40-65', label: '40-65' },
-                { value: '65+', label: '65+' }
+                { value: '65+' },
             ],
             required: false
         },
@@ -174,34 +174,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     };
 
-    // --- NEW INACTIVITY & AUTO-SUBMISSION LOGIC ---
+    // --- INACTIVITY & AUTO-SUBMISSION LOGIC ---
     const resetInactivityTimer = () => {
         clearTimeout(appState.inactivityTimeout);
         // Clear the countdown overlay and timer if a user becomes active again
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
-            overlay.classList.add('hidden');
+            overlay.classList.add('invisible', 'opacity-0');
+            overlay.classList.remove('flex', 'opacity-100'); // Ensure it hides completely
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
         appState.isUserActive = true; // Mark user as active
-        if (appState.currentPage === 0) {
-            stopQuestionRotation(); // Stop rotation as soon as the user interacts
-        }
+        // REMOVED: stopQuestionRotation() call for Q1. Rotation must continue.
     };
 
     const handleInactivityTimeout = () => {
         log("Inactivity timer expired.");
-        if (Object.keys(appState.formData).length > 0) {
-            log("User inactive with partial data. Triggering auto-submit countdown.");
+        
+        // CUSTOM LOGIC: Only auto-submit/sync if the first required question has been answered.
+        const firstQuestionName = surveyQuestions[0].name; // 'comments'
+        
+        if (appState.formData[firstQuestionName] && appState.formData[firstQuestionName].trim() !== '') {
+            log("User inactive with partial data (Q1 answered). Triggering auto-submit countdown.");
             autoSubmitSurvey();
         } else {
-            log("User inactive on first page with no data. Resetting survey.");
+            log("User inactive on first page with no required data. Resetting survey.");
             resetSurvey();
         }
     };
 
-    // --- Question Rotation Logic ---
+    // --- Question Rotation Logic (Modified to run continuously) ---
     const startQuestionRotation = () => {
         if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
         rotateQuestions();
@@ -220,14 +223,13 @@ document.addEventListener('DOMContentLoaded', () => {
             questionElement.textContent += text.charAt(i);
             appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
         } else {
-            if (!appState.isUserActive) {
-                appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
-            }
+            // ALWAYS schedule the next rotation, regardless of user activity
+            appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
         }
     };
 
     const rotateQuestions = () => {
-        if (appState.stopRotationPermanently) return;
+        if (appState.stopRotationPermanently || appState.currentPage !== 0) return;
         const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
         if (!rotatingQuestionEl) return;
         stopQuestionRotation();
@@ -248,8 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
-                textarea.addEventListener('focus', () => stopQuestionRotation());
-                textarea.addEventListener('blur', () => !appState.stopRotationPermanently && startQuestionRotation());
+                // REMOVED: Rotation stopping/starting on focus/blur events to allow continuous rotation
             }
         },
         'emoji-radio': {
@@ -320,7 +321,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             otherContainer.classList.remove('hidden');
                         } else {
                             otherContainer.classList.add('hidden');
-                            otherContainer.querySelector('input').value = '';
+                            // Clear 'other_location' from formData and input if a main option is selected
+                            const otherInput = otherContainer.querySelector('input');
+                            if (otherInput) otherInput.value = '';
+                            delete appState.formData['other_location'];
+
                             handleNextQuestion();
                         }
                     });
@@ -376,6 +381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         emailContainer.classList.add('hidden-fields');
                         emailInput.required = false;
                         emailInput.value = '';
+                        delete appState.formData['email'];
                     }
                 });
             }
@@ -414,16 +420,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle page-specific UI states
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
-            if (!appState.isUserActive) startQuestionRotation();
+            // Start rotation continuously on page 0
+            startQuestionRotation(); 
         } else {
             backButton.style.visibility = 'visible';
-            stopQuestionRotation();
+            stopQuestionRotation(); // Stop rotation on other pages
         }
 
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
     };
 
-    // --- Validation Logic ---
+    // --- Validation Logic (Unchanged) ---
     const clearValidationErrors = () => {
         questionContainer.querySelectorAll('.error-message').forEach(span => span.classList.add('hidden'));
         questionContainer.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
@@ -474,7 +481,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return isValid;
     };
 
-    // --- Navigation and Submission ---
+    // --- Navigation and Submission (Unchanged) ---
     const handleNextQuestion = async () => {
         if (!validatePage()) return;
 
@@ -506,7 +513,10 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(appState.countdownIntervalId);
         }
 
-        overlay.classList.remove('hidden');
+        // Use flex and remove invisible to show the overlay
+        overlay.classList.remove('invisible', 'opacity-0');
+        overlay.classList.add('flex', 'opacity-100');
+        
         let countdown = config.autoSubmitCountdown;
         countdownSpan.textContent = countdown;
 
@@ -523,13 +533,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     is_incomplete: true
                 };
                 storeSubmission(submission);
-                resetSurvey();
+                // The auto-submit should trigger a simple reset, not show the thank you screen
+                resetSurvey(); 
                 syncData();
             }
         }, 1000);
     };
 
-    // --- Data Storage and API Communication ---
+    // --- Data Storage and API Communication (Unchanged) ---
     const getStoredSubmissions = () => {
         try {
             return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
@@ -556,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     };
 
-    // --- NEW CONCURRENT SYNC LOGIC ---
+    // --- CONCURRENT SYNC LOGIC (Unchanged) ---
     const syncData = async () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
@@ -599,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- UI State Management ---
+    // --- UI State Management (Modified) ---
     const toggleUI = (enable) => {
         const isSubmitButton = appState.currentPage === surveyQuestions.length - 1;
         nextButton.disabled = !enable;
@@ -615,17 +626,24 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
-        overlay.classList.add('hidden');
+        overlay.classList.remove('flex', 'opacity-100');
+        overlay.classList.add('invisible', 'opacity-0');
+
         updateProgressBar(true); // Set progress to 100% on completion
 
         questionContainer.innerHTML = `
-            <div class="checkmark-container min-h-[300px]">
-                <div class="checkmark-circle"><div class="checkmark-icon">✓</div></div>
+            <div class="flex flex-col items-center justify-center h-full checkmark-container min-h-[300px]">
+                <div class="flex items-center justify-center w-24 h-24 rounded-full checkmark-circle">
+                    <div class="text-white text-6xl checkmark-icon">✓</div>
+                </div>
                 <h2 class="text-2xl font-bold text-gray-800 mt-6">Thank You!</h2>
                 <p class="text-gray-600 mt-2">Your feedback has been saved.</p>
             </div>`;
-        nextButton.style.display = 'none';
-        backButton.style.display = 'none';
+        
+        // BUG FIX 2: Disable buttons instead of hiding them
+        nextButton.disabled = true;
+        backButton.disabled = true;
+
         setTimeout(resetSurvey, config.resetTime);
     };
 
@@ -640,16 +658,20 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
-        overlay.classList.add('hidden');
+        overlay.classList.remove('flex', 'opacity-100');
+        overlay.classList.add('invisible', 'opacity-0');
 
         form.reset();
-        nextButton.style.display = 'block';
-        backButton.style.display = 'block';
+        
+        // Restore buttons visibility and state
+        nextButton.disabled = false;
+        backButton.disabled = false;
+        
         renderPage(appState.currentPage);
         toggleUI(true);
     };
 
-    // --- Admin Control Logic ---
+    // --- Admin Control Logic (Unchanged) ---
     const hideAdminControls = () => {
         syncButton.classList.add('hidden');
         adminClearButton.classList.add('hidden');
@@ -657,7 +679,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showTemporaryMessage("Admin controls hidden.", "info");
     };
 
-    // --- Event Handlers ---
+    // --- Event Handlers (Unchanged) ---
     nextButton.addEventListener('click', (e) => {
         e.preventDefault();
         handleNextQuestion();
@@ -691,7 +713,8 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
-        overlay.classList.add('hidden');
+        overlay.classList.remove('flex', 'opacity-100');
+        overlay.classList.add('invisible', 'opacity-0');
         resetInactivityTimer();
     });
 
@@ -712,6 +735,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPage(appState.currentPage);
     resetInactivityTimer();
 
-    // Start a periodic sync check for when the device comes back online
-    appState.syncIntervalId = setInterval(syncData, 60000); // Check every minute
+    // Start a periodic sync check: 15 minutes = 900000 milliseconds
+    appState.syncIntervalId = setInterval(syncData, 900000); 
 });
