@@ -155,13 +155,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     };
 
-    const updateProgressBar = () => {
-        const progress = (appState.currentPage / (surveyQuestions.length - 1)) * 100;
+    const updateProgressBar = (isSubmitted = false) => {
+        // Correct calculation for linear progression
+        let progress = (appState.currentPage / surveyQuestions.length) * 100;
+        if (isSubmitted) {
+            progress = 100; // Set to 100% on successful submission
+        }
         progressBar.style.width = `${progress}%`;
     };
 
     const showTemporaryMessage = (message, type = 'info') => {
-        const className = type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+        const className = type === 'error' ? 'bg-red-100 text-red-700' : (type === 'success' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700');
         statusMessage.textContent = message;
         statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
         statusMessage.style.display = 'block';
@@ -170,34 +174,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     };
 
-    // --- Inactivity and User Activity ---
-    const handleUserActivity = () => {
+    // --- NEW INACTIVITY & AUTO-SUBMISSION LOGIC ---
+    const resetInactivityTimer = () => {
         clearTimeout(appState.inactivityTimeout);
-        log("User activity detected. isUserActive set to TRUE.");
-        appState.isUserActive = true;
-        appState.stopRotationPermanently = true;
-
-        // Clear the countdown overlay and timer on activity
+        // Clear the countdown overlay and timer if a user becomes active again
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
             overlay.classList.add('hidden');
         }
-
-        appState.inactivityTimeout = setTimeout(() => {
-            log("Inactivity timer expired. isUserActive:", appState.isUserActive);
-            // CRITICAL FIX: The auto-submit logic should check the formData length, not the isUserActive flag here.
-            if (Object.keys(appState.formData).length > 0) {
-                log("User inactive with partial data. Triggering auto-submit.");
-                autoSubmitSurvey();
-            } else {
-                log("User inactive on first page with no data. Resetting survey.");
-                resetSurvey();
-            }
-        }, config.inactivityTime);
+        appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
+        appState.isUserActive = true; // Mark user as active
+        if (appState.currentPage === 0) {
+            stopQuestionRotation(); // Stop rotation as soon as the user interacts
+        }
     };
 
-    const debouncedHandleActivity = debounce(handleUserActivity, config.debounceDelay);
+    const handleInactivityTimeout = () => {
+        log("Inactivity timer expired.");
+        if (Object.keys(appState.formData).length > 0) {
+            log("User inactive with partial data. Triggering auto-submit countdown.");
+            autoSubmitSurvey();
+        } else {
+            log("User inactive on first page with no data. Resetting survey.");
+            resetSurvey();
+        }
+    };
 
     // --- Question Rotation Logic ---
     const startQuestionRotation = () => {
@@ -244,7 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
                 <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
-            setupEvents: (q, handlers) => {
+            setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
                 textarea.addEventListener('focus', () => stopQuestionRotation());
                 textarea.addEventListener('blur', () => !appState.stopRotationPermanently && startQuestionRotation());
@@ -397,8 +399,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // General and specific event listeners
         const allInputs = questionContainer.querySelectorAll('input, textarea');
         allInputs.forEach(input => {
-            input.addEventListener('input', debouncedHandleActivity);
-            input.addEventListener('change', debouncedHandleActivity);
+            input.addEventListener('input', resetInactivityTimer);
+            input.addEventListener('change', resetInactivityTimer);
         });
 
         renderer.setupEvents(questionData, { handleNextQuestion });
@@ -499,15 +501,12 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const autoSubmitSurvey = () => {
-        // The condition to run is that the countdown is triggered, not the user state.
         log("Auto-submit triggered. Starting countdown.");
-
-        // Clear any existing countdown timer before starting a new one
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
         }
 
-        overlay.classList.remove('hidden'); // Show the overlay
+        overlay.classList.remove('hidden');
         let countdown = config.autoSubmitCountdown;
         countdownSpan.textContent = countdown;
 
@@ -557,6 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     };
 
+    // --- NEW CONCURRENT SYNC LOGIC ---
     const syncData = async () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
@@ -570,9 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         showTemporaryMessage(`Syncing ${submissions.length} submissions...`);
-        const successfullySyncedIds = [];
 
-        for (const submission of submissions) {
+        // Use Promise.all to handle all requests concurrently
+        const syncPromises = submissions.map(async (submission) => {
             try {
                 const response = await fetch(API_ENDPOINT, {
                     method: 'POST',
@@ -580,20 +580,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify(submission),
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-                successfullySyncedIds.push(submission.id);
-                log(`Successfully synced submission ID: ${submission.id}`);
+                return submission.id; // Return the ID on success
             } catch (error) {
                 console.error(`Sync failed for submission ID: ${submission.id}. Will retry later.`, error);
+                return null; // Return null on failure
             }
-        }
+        });
 
-        if (successfullySyncedIds.length > 0) {
-            removeSyncedSubmissions(successfullySyncedIds);
-            const message = `${successfullySyncedIds.length} of ${submissions.length} submissions synced.`;
-            showTemporaryMessage(message, successfullySyncedIds.length === submissions.length ? 'success' : 'info');
+        const syncedIds = (await Promise.all(syncPromises)).filter(id => id !== null);
+
+        if (syncedIds.length > 0) {
+            removeSyncedSubmissions(syncedIds);
+            const remainingCount = submissions.length - syncedIds.length;
+            const message = `${syncedIds.length} submission${syncedIds.length !== 1 ? 's' : ''} synced. ${remainingCount > 0 ? `${remainingCount} to go.` : ''}`;
+            showTemporaryMessage(message, remainingCount === 0 ? 'success' : 'info');
         } else {
-            showTemporaryMessage('Sync failed. Please check connection or API.', 'error');
+            showTemporaryMessage('Sync failed. Check API or network.', 'error');
         }
     };
 
@@ -614,6 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.countdownIntervalId = null;
         }
         overlay.classList.add('hidden');
+        updateProgressBar(true); // Set progress to 100% on completion
 
         questionContainer.innerHTML = `
             <div class="checkmark-container min-h-[300px]">
@@ -629,7 +632,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetSurvey = () => {
         appState.currentPage = 0;
         appState.formData = {};
-        appState.isUserActive = false; // CRITICAL: Reset the user activity flag for the next session
+        appState.isUserActive = false;
         appState.stopRotationPermanently = false;
 
         // Hide the overlay on every reset
@@ -689,25 +692,26 @@ document.addEventListener('DOMContentLoaded', () => {
             appState.countdownIntervalId = null;
         }
         overlay.classList.add('hidden');
-        // CRITICAL FIX: Restart the inactivity timer after the user cancels.
-        handleUserActivity();
+        resetInactivityTimer();
     });
 
-    syncButton.addEventListener('click', syncData);
-    adminClearButton.addEventListener('click', () => {
-        log("Clearing all local data.");
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
-        showTemporaryMessage("All local data cleared!", "success");
+    syncButton.addEventListener('click', async () => {
+        await syncData();
     });
+    
+    adminClearButton.addEventListener('click', () => {
+        if(confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+            showTemporaryMessage("All local submissions cleared.", "success");
+        }
+    });
+
     hideAdminButton.addEventListener('click', hideAdminControls);
 
-    // Initial setup
+    // Initial render and setup
     renderPage(appState.currentPage);
-    handleUserActivity();
+    resetInactivityTimer();
 
-    // Event listeners for overall user activity
-    document.addEventListener('mousemove', debouncedHandleActivity);
-    document.addEventListener('keypress', debouncedHandleActivity);
-    document.addEventListener('touchstart', debouncedHandleActivity);
-    window.addEventListener('scroll', debouncedHandleActivity);
+    // Start a periodic sync check for when the device comes back online
+    appState.syncIntervalId = setInterval(syncData, 60000); // Check every minute
 });
