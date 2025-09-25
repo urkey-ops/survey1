@@ -70,7 +70,6 @@ body {
     max-height: 0;
     overflow: hidden;
     pointer-events: none;
-    /* Removed redundant 'visibility' transition, relying on opacity and max-height */
     transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out; 
 }
 .visible-fields {
@@ -78,18 +77,6 @@ body {
     max-height: 1000px; /* set to a large enough value to animate open */
     pointer-events: auto;
 }
-
-/* Loading bar styles (Structural, custom component kept) */
-.loading-bar-container {
-    /* Removed utility-like classes for width, background-color, border-radius, height, overflow */
-}
-.loading-bar {
-    background-color: var(--sewa-blue);
-    /* Removed utility-like classes for height, border-radius, and transition */
-}
-
-/* Error state style for inputs/containers (Kept, as Tailwind does not define the ':checked' state on the ancestor element) */
-/* NOTE: The styling for .error-message itself should be managed by Tailwind, e.g., 'text-red-700 text-sm' */
 
 /* Error state style for inputs/containers - simplified and kept to apply border/shadow to *containers* */
 .has-error {
@@ -100,17 +87,13 @@ body {
 
 /* Checkmark animation styles (Complex animation and structure must be kept) */
 .checkmark-container {
-    /* Removed display/flex utilities */
     min-height: 300px; /* Kept specific sizing */
 }
 .checkmark-circle {
-    /* Removed display/flex utilities */
     background-color: #22c55e;
     animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
-    /* Removed width, height, border-radius, display/justify/align */
 }
 .checkmark-icon {
-    /* Removed color and font size */
     font-weight: bold;
 }
 
@@ -133,7 +116,6 @@ body {
 .spinner {
     border: 4px solid rgba(255, 255, 255, 0.3);
     border-top-color: #fff;
-    /* Removed width, height, border-radius, and animation properties */
     animation: spin 1s ease-in-out infinite;
 }
 @keyframes spin {
@@ -146,10 +128,4 @@ body {
 input:focus, textarea:focus, button:focus, label:focus {
     outline: 2px solid var(--sewa-orange);
     outline-offset: 2px;
-}
-
-/* CRITICAL FIX: Ensure button container and buttons are always visible on the UI layer */
-#buttonContainer, #nextButton, #backButton {
-    visibility: visible !important; 
-    opacity: 1 !important;
 }
