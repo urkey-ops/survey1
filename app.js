@@ -185,9 +185,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
         appState.isUserActive = true; // Mark user as active
-        if (appState.currentPage === 0) {
-            stopQuestionRotation(); // Stop rotation as soon as the user interacts
-        }
     };
 
     const handleInactivityTimeout = () => {
@@ -200,8 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
             resetSurvey();
         }
     };
-
-    // --- Question Rotation Logic ---
+    
+    // --- Corrected Rotation Logic ---
     const startQuestionRotation = () => {
         if (appState.currentPage !== 0 || appState.stopRotationPermanently) return;
         rotateQuestions();
@@ -220,12 +217,13 @@ document.addEventListener('DOMContentLoaded', () => {
             questionElement.textContent += text.charAt(i);
             appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
         } else {
+            // Once typing is complete, check if user is active.
             if (!appState.isUserActive) {
                 appState.displayTimeout = setTimeout(rotateQuestions, config.rotationDisplayTime);
             }
         }
     };
-
+    
     const rotateQuestions = () => {
         if (appState.stopRotationPermanently) return;
         const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
@@ -238,6 +236,13 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.questionRotationIndex = (appState.questionRotationIndex + 1) % questionData.rotatingText.length;
         typeWriter(currentQuestion, 0);
     };
+    
+    // NEW: Function to stop rotation gracefully
+    const handleInputStart = () => {
+        // This flag ensures no new rotation cycle will start.
+        appState.stopRotationPermanently = true;
+        // The current typing animation or display time will complete naturally.
+    };
 
     // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
@@ -248,8 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
             setupEvents: (q) => {
                 const textarea = document.getElementById(q.id);
-                textarea.addEventListener('focus', () => stopQuestionRotation());
-                textarea.addEventListener('blur', () => !appState.stopRotationPermanently && startQuestionRotation());
+                // Listen for any form of input to signal user activity
+                textarea.addEventListener('input', resetInactivityTimer);
+                textarea.addEventListener('focus', handleInputStart);
+                textarea.addEventListener('blur', resetInactivityTimer);
             }
         },
         'emoji-radio': {
@@ -266,7 +273,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        handleInputStart();
+                        resetInactivityTimer();
+                        handleNextQuestion();
+                    });
+                });
             }
         },
         'number-scale': {
@@ -281,7 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="flex justify-between text-sm mt-2 text-gray-500"><span>${q.labels.min}</span><span>${q.labels.max}</span></div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        handleInputStart();
+                        resetInactivityTimer();
+                        handleNextQuestion();
+                    });
+                });
             }
         },
         'star-rating': {
@@ -295,7 +314,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        handleInputStart();
+                        resetInactivityTimer();
+                        handleNextQuestion();
+                    });
+                });
             }
         },
         'radio-with-other': {
@@ -315,6 +340,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setupEvents: (q, { handleNextQuestion }) => {
                 document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
                     radio.addEventListener('change', (e) => {
+                        handleInputStart();
+                        resetInactivityTimer();
                         const otherContainer = document.getElementById('other-location-container');
                         if (e.target.value === 'Other') {
                             otherContainer.classList.remove('hidden');
@@ -338,7 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => radio.addEventListener('change', handleNextQuestion));
+                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        handleInputStart();
+                        resetInactivityTimer();
+                        handleNextQuestion();
+                    });
+                });
             }
         },
         'custom-contact': {
@@ -365,6 +398,8 @@ document.addEventListener('DOMContentLoaded', () => {
             setupEvents: () => {
                 const checkbox = document.getElementById('newsletterConsent');
                 checkbox.addEventListener('change', (e) => {
+                    handleInputStart();
+                    resetInactivityTimer();
                     const emailContainer = document.getElementById('email-field-container');
                     const emailInput = document.getElementById('email');
                     if (e.target.checked) {
@@ -378,6 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         emailInput.value = '';
                     }
                 });
+                document.getElementById('name').addEventListener('input', resetInactivityTimer);
+                document.getElementById('email').addEventListener('input', resetInactivityTimer);
             }
         }
     };
@@ -396,28 +433,20 @@ document.addEventListener('DOMContentLoaded', () => {
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
 
-        // General and specific event listeners
-        const allInputs = questionContainer.querySelectorAll('input, textarea');
-        allInputs.forEach(input => {
-            input.addEventListener('input', resetInactivityTimer);
-            input.addEventListener('change', resetInactivityTimer);
-        });
-
         renderer.setupEvents(questionData, { handleNextQuestion });
 
-        // Auto-focus on the first interactive element for better a11y and UX
         const firstInput = questionContainer.querySelector('input:not([type="hidden"]), textarea');
         if (firstInput) {
             firstInput.focus();
         }
 
-        // Handle page-specific UI states
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
             if (!appState.isUserActive) startQuestionRotation();
         } else {
             backButton.style.visibility = 'visible';
-            stopQuestionRotation();
+            // Explicitly stop rotation if not on the first page
+            appState.stopRotationPermanently = true;
         }
 
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
@@ -447,7 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const questionData = surveyQuestions[appState.currentPage];
         let isValid = true;
 
-        // Update formData from the current page's form elements
         const currentData = Object.fromEntries(new FormData(form));
         Object.assign(appState.formData, currentData);
         log("Updated appState.formData:", appState.formData);
@@ -556,7 +584,6 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(remaining));
     };
 
-    // --- NEW CONCURRENT SYNC LOGIC ---
     const syncData = async () => {
         const submissions = getStoredSubmissions();
         if (submissions.length === 0) {
@@ -571,7 +598,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showTemporaryMessage(`Syncing ${submissions.length} submissions...`);
 
-        // Use Promise.all to handle all requests concurrently
         const syncPromises = submissions.map(async (submission) => {
             try {
                 const response = await fetch(API_ENDPOINT, {
@@ -610,7 +636,6 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const showCompletionScreen = () => {
-        // Hide the overlay if it was shown for auto-submit
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -635,7 +660,6 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.isUserActive = false;
         appState.stopRotationPermanently = false;
 
-        // Hide the overlay on every reset
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
