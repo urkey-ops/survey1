@@ -6,12 +6,13 @@
 }
 
 body {
+    /* Retain font, background, and color, which act as a global reset */
     font-family: 'Roboto', sans-serif;
     background-color: #f0f4f8;
     color: #333;
 }
 
-/* Visually hidden for accessibility */
+/* Visually hidden for accessibility (A utility-first framework may have an equivalent, but this is a standard A11y must-have) */
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -23,7 +24,7 @@ body {
     border: 0;
 }
 
-/* Selected emoji-radio and number-scale styles */
+/* Selected emoji-radio and number-scale styles (Complex structural/state logic kept) */
 .emoji-radio-group input:checked + label,
 .number-scale-group input:checked + label {
     border-color: var(--sewa-orange);
@@ -33,7 +34,7 @@ body {
     color: var(--sewa-orange);
 }
 
-/* Labels hover and transition styles */
+/* Labels hover and transition styles (Kept to ensure smooth non-utility effects) */
 .emoji-radio-group label,
 .number-scale-group label,
 .location-radio-group label {
@@ -41,7 +42,7 @@ body {
     cursor: pointer;
 }
 
-/* Accessibility-friendly star rating styles */
+/* Star rating styles (Complex sibling/state selectors must be kept) */
 .star-rating input {
     display: none;
 }
@@ -55,7 +56,7 @@ body {
     color: #ffc107;
 }
 
-/* Location radio group selected style */
+/* Location radio group selected style (Specific state-based styling kept) */
 .location-radio-group input:checked + label {
     background-color: var(--sewa-orange);
     color: white;
@@ -63,13 +64,14 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Hidden fields - animate height with max-height for smooth transition */
+/* Hidden fields - animate height with max-height (A technique not easily done with standard utility classes like 'hidden') */
 .hidden-fields {
     opacity: 0;
     max-height: 0;
     overflow: hidden;
     pointer-events: none;
-    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out;
+    /* Removed redundant 'visibility' transition, relying on opacity and max-height */
+    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out; 
 }
 .visible-fields {
     opacity: 1;
@@ -77,95 +79,42 @@ body {
     pointer-events: auto;
 }
 
-/* Loading bar styles */
+/* Loading bar styles (Structural, custom component kept) */
 .loading-bar-container {
-    width: 100%;
-    background-color: #e2e8f0;
-    border-radius: 999px;
-    height: 12px;
-    overflow: hidden;
+    /* Removed utility-like classes for width, background-color, border-radius, height, overflow */
 }
 .loading-bar {
-    height: 100%;
     background-color: var(--sewa-blue);
-    border-radius: 999px;
-    transition: width 0.3s ease-in-out;
+    /* Removed utility-like classes for height, border-radius, and transition */
 }
 
-/* Error message styles */
-.error-message {
-    color: #dc2626;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-    display: block;
-}
+/* Error state style for inputs/containers (Kept, as Tailwind does not define the ':checked' state on the ancestor element) */
+/* NOTE: The styling for .error-message itself should be managed by Tailwind, e.g., 'text-red-700 text-sm' */
 
-/* Error state style for inputs/containers */
+/* Error state style for inputs/containers - simplified and kept to apply border/shadow to *containers* */
 .has-error {
-    border-color: #dc2626 !important;
+    /* Retained to override base/utility styling on error */
+    border-color: #dc2626 !important; 
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
 
-/* Overlay styles for modal / auto-submit countdown */
-#overlay {
-    position: fixed; /* Use fixed for overlays to cover entire viewport */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(255, 255, 255, 0.9);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.5s ease, visibility 0.5s ease;
-    z-index: 50;
-}
-#overlay.visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-/* Cancel button styles */
-#cancelButton {
-    background-color: #ef4444;
-    color: white;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    cursor: pointer;
-    font-weight: 600;
-}
-#cancelButton:hover {
-    background-color: #dc2626;
-}
-
-/* Checkmark animation styles */
+/* Checkmark animation styles (Complex animation and structure must be kept) */
 .checkmark-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    min-height: 300px;
+    /* Removed display/flex utilities */
+    min-height: 300px; /* Kept specific sizing */
 }
 .checkmark-circle {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
+    /* Removed display/flex utilities */
     background-color: #22c55e;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
+    /* Removed width, height, border-radius, display/justify/align */
 }
 .checkmark-icon {
-    color: white;
-    font-size: 4rem;
+    /* Removed color and font size */
     font-weight: bold;
 }
 
-/* BounceIn keyframes for checkmark */
+/* BounceIn keyframes for checkmark (Must be kept) */
 @keyframes bounceIn {
     0% {
         transform: scale(0);
@@ -180,13 +129,11 @@ body {
     }
 }
 
-/* Spinner styles for loading states */
+/* Spinner styles for loading states (Must be kept) */
 .spinner {
     border: 4px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
     border-top-color: #fff;
-    width: 1.5rem;
-    height: 1.5rem;
+    /* Removed width, height, border-radius, and animation properties */
     animation: spin 1s ease-in-out infinite;
 }
 @keyframes spin {
@@ -195,7 +142,7 @@ body {
     }
 }
 
-/* Focus outline for accessibility */
+/* Focus outline for accessibility (Critical A11y component kept) */
 input:focus, textarea:focus, button:focus, label:focus {
     outline: 2px solid var(--sewa-orange);
     outline-offset: 2px;
