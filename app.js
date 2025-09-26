@@ -131,7 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
         displayTimeout: null,
         inactivityTimeout: null,
         countdownIntervalId: null,
-        isUserActive: false,
+        isUserActive: false, // Starts as false
         adminClickCount: 0,
         adminTimer: null,
         stopRotationPermanently: false,
@@ -164,13 +164,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * @description Hides the Next/Back button container. 
-     * This relies on having an initial `hidden` class on the #buttonContainer in HTML.
      */
     const hideButtonContainer = () => {
-        // Assume you have a CSS rule or initial HTML class that sets display: none or adds 'hidden'
-        // We'll use the 'hidden' Tailwind class here.
+        // Use Tailwind classes for graceful transition
         buttonContainer.classList.add('invisible', 'opacity-0');
-        buttonContainer.classList.remove('flex'); // Remove flex to ensure it collapses correctly if needed
+        buttonContainer.classList.remove('flex'); 
     };
 
     /**
@@ -181,14 +179,19 @@ document.addEventListener('DOMContentLoaded', () => {
         buttonContainer.classList.add('flex');
     };
     // Initialize state: Hide the button container on page load
-    // The user needs to add a 'hidden' or 'invisible' class to the #buttonContainer in index.html
-    // For now, we'll force hide it on initialization
     buttonContainer.classList.add('invisible', 'opacity-0');
 
 
-    // --- INACTIVITY & AUTO-SUBMISSION LOGIC ---
-    const resetInactivityTimer = () => {
+    // --- INACTIVITY & AUTO-SUBMISSION LOGIC (REFACTORED) ---
+    
+    /**
+     * @description Clears and resets the inactivity timer only. 
+     * Does not affect button visibility or active state.
+     */
+    const monitorInactivity = () => {
         clearTimeout(appState.inactivityTimeout);
+        
+        // Clear and hide the countdown overlay if it's visible
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
@@ -196,9 +199,16 @@ document.addEventListener('DOMContentLoaded', () => {
             overlay.classList.remove('flex', 'opacity-100'); 
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
+    };
+
+    /**
+     * @description Responds to user input: resets the timer AND manages button visibility.
+     */
+    const handleUserActivity = () => {
+        monitorInactivity(); // Always reset the timer on activity
         
-        // 🚨 FIX FOR BUTTON VISIBILITY 🚨
-        // If it's the first page and the user has just become active, show the buttons.
+        // 🚨 CRITICAL VISIBILITY CHECK 🚨
+        // Only show buttons for the first time on the first page
         if (!appState.isUserActive && appState.currentPage === 0) {
             showButtonContainer(); 
         }
@@ -211,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const firstQuestionName = surveyQuestions[0].name; 
         
+        // Check if the first required input has data (a sign of partial submission)
         if (appState.formData[firstQuestionName] && appState.formData[firstQuestionName].trim() !== '') {
             log("User inactive with partial data (Q1 answered). Triggering auto-submit countdown.");
             autoSubmitSurvey();
@@ -288,7 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
         typeWriter(currentQuestion, 0);
     };
 
-    // --- Modular Question Rendering & Event Handling (NOW FULLY INCLUDED) ---
+    // --- Modular Question Rendering & Event Handling ---
     const questionRenderers = {
         'textarea': {
             render: (q, data) => `
@@ -451,12 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
 
-        // General and specific event listeners
+        // **NEW EVENT LISTENER LOGIC:** Use handleUserActivity()
         const allInputs = questionContainer.querySelectorAll('input, textarea');
         allInputs.forEach(input => {
-            input.addEventListener('input', resetInactivityTimer);
-            input.addEventListener('change', resetInactivityTimer);
+            input.addEventListener('input', handleUserActivity);
+            input.addEventListener('change', handleUserActivity);
         });
+        // **END NEW LOGIC**
 
         renderer.setupEvents(questionData, { handleNextQuestion });
 
@@ -470,7 +482,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
             
-            // 🚨 CONCEAL BUTTONS ON Q1 UNTIL USER INTERACTS 🚨
+            // CONCEAL BUTTONS ON Q1 UNTIL USER INTERACTS 
             if (!appState.isUserActive) {
                 hideButtonContainer(); 
             } else {
@@ -670,7 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetSurvey = () => {
         appState.currentPage = 0;
         appState.formData = {};
-        appState.isUserActive = false;
+        appState.isUserActive = false; // Reset to inactive
         appState.stopRotationPermanently = false;
 
         if (appState.countdownIntervalId) {
@@ -734,7 +746,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         overlay.classList.remove('flex', 'opacity-100');
         overlay.classList.add('invisible', 'opacity-0');
-        resetInactivityTimer();
+        monitorInactivity(); // Just restart the timer, don't change active state
     });
 
     syncButton.addEventListener('click', async () => {
@@ -752,7 +764,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial render and setup
     renderPage(appState.currentPage);
-    resetInactivityTimer();
+    // 🚨 FINAL FIX: Start the monitor, but do not set active state or show buttons 
+    monitorInactivity(); 
 
     // Start a periodic sync check (15 minutes)
     appState.syncIntervalId = setInterval(syncData, 900000); 
