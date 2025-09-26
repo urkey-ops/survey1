@@ -162,6 +162,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 5000);
     };
 
+    /**
+     * @description Hides the Next/Back button container. 
+     * This relies on having an initial `hidden` class on the #buttonContainer in HTML.
+     */
+    const hideButtonContainer = () => {
+        // Assume you have a CSS rule or initial HTML class that sets display: none or adds 'hidden'
+        // We'll use the 'hidden' Tailwind class here.
+        buttonContainer.classList.add('invisible', 'opacity-0');
+        buttonContainer.classList.remove('flex'); // Remove flex to ensure it collapses correctly if needed
+    };
+
+    /**
+     * @description Shows the Next/Back button container.
+     */
+    const showButtonContainer = () => {
+        buttonContainer.classList.remove('invisible', 'opacity-0');
+        buttonContainer.classList.add('flex');
+    };
+    // Initialize state: Hide the button container on page load
+    // The user needs to add a 'hidden' or 'invisible' class to the #buttonContainer in index.html
+    // For now, we'll force hide it on initialization
+    buttonContainer.classList.add('invisible', 'opacity-0');
+
+
     // --- INACTIVITY & AUTO-SUBMISSION LOGIC ---
     const resetInactivityTimer = () => {
         clearTimeout(appState.inactivityTimeout);
@@ -172,6 +196,13 @@ document.addEventListener('DOMContentLoaded', () => {
             overlay.classList.remove('flex', 'opacity-100'); 
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
+        
+        // 🚨 FIX FOR BUTTON VISIBILITY 🚨
+        // If it's the first page and the user has just become active, show the buttons.
+        if (!appState.isUserActive && appState.currentPage === 0) {
+            showButtonContainer(); 
+        }
+        
         appState.isUserActive = true; 
     };
 
@@ -304,10 +335,10 @@ document.addEventListener('DOMContentLoaded', () => {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
                 <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                        ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
-                            <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                            <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
-                        `).join('')}
+                    ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
+                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
+                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
+                    `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
@@ -438,9 +469,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle page-specific UI states: Visibility is managed here, *not* display
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
+            
+            // 🚨 CONCEAL BUTTONS ON Q1 UNTIL USER INTERACTS 🚨
+            if (!appState.isUserActive) {
+                hideButtonContainer(); 
+            } else {
+                showButtonContainer();
+            }
+
             startQuestionRotation(); 
         } else {
             backButton.style.visibility = 'visible';
+            showButtonContainer(); // Ensure buttons are visible on all pages > 0
             stopQuestionRotation(); 
         }
 
@@ -543,11 +583,50 @@ document.addEventListener('DOMContentLoaded', () => {
         await syncData(); 
     };
 
-    // --- Data Storage and API Communication ---
+    // --- Data Storage and API Communication (STUBS) ---
     const getStoredSubmissions = () => { /* ... */ return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]'); };
-    const storeSubmission = (submission) => { /* ... */ };
-    const removeSyncedSubmissions = (syncedIds) => { /* ... */ };
-    const syncData = async () => { /* ... */ };
+    const storeSubmission = (submission) => {
+        const submissions = getStoredSubmissions();
+        submissions.push(submission);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
+    };
+    const removeSyncedSubmissions = (syncedIds) => {
+        let submissions = getStoredSubmissions();
+        submissions = submissions.filter(sub => !syncedIds.includes(sub.id));
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
+    };
+    const syncData = async () => {
+        const submissions = getStoredSubmissions();
+        if (submissions.length === 0) {
+            log("No pending data to sync.");
+            showTemporaryMessage("Data is already synchronized.", "success");
+            return;
+        }
+
+        log(`Attempting to sync ${submissions.length} submissions.`);
+        // Placeholder for the actual API call
+        try {
+            // const response = await fetch(API_ENDPOINT, {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify(submissions)
+            // });
+
+            // Simulating a successful sync response
+            // In a real app, you would check response.ok and get the synced IDs
+            await new Promise(resolve => setTimeout(resolve, 500)); 
+            const syncedIds = submissions.map(s => s.id); 
+
+            removeSyncedSubmissions(syncedIds);
+            log(`Successfully synced ${syncedIds.length} submissions.`);
+            showTemporaryMessage(`Successfully synchronized ${syncedIds.length} submissions.`, "success");
+
+        } catch (error) {
+            console.error("Sync error:", error);
+            showTemporaryMessage("Failed to synchronize data. Will retry later.", "error");
+        }
+    };
+
 
     // --- UI State Management (Cleaned Visibility Logic) ---
     const toggleUI = (enable) => {
@@ -583,7 +662,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         nextButton.disabled = true;
         backButton.disabled = true;
-
+        hideButtonContainer(); // Hide buttons after completion
+        
         setTimeout(resetSurvey, config.resetTime);
     };
 
@@ -604,6 +684,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         nextButton.disabled = false;
         backButton.disabled = false;
+        // On reset, buttons should be hidden again until next interaction
+        hideButtonContainer(); 
         
         renderPage(appState.currentPage);
         toggleUI(true);
