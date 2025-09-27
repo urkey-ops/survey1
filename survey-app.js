@@ -1,4 +1,4 @@
-// --- survey-app.js (VERSION 8: Hardened Data Integrity & Timer Cleanup) ---
+// --- survey-app.js (VERSION 9: Graceful Countdown Reset) ---
 
 // --- CONFIGURATION CONSTANTS ---
 const MAX_RETRIES = 3;
@@ -35,7 +35,7 @@ function safeGetLocalStorage(key) {
 }
 
 /**
- * Safely writes a JSON item to localStorage with error handling. (NEW)
+ * Safely writes a JSON item to localStorage with error handling. (P1)
  */
 function safeSetLocalStorage(key, value) {
     try {
@@ -62,7 +62,7 @@ const DEFAULT_STATE = {
     inactivityTimer: null,
     syncTimer: null,
     rotationInterval: null, 
-    postSubmitResetTimer: null,
+    // postSubmitResetTimer removed, logic moved to a local variable in submitSurvey
     adminClickCount: 0 
 };
 
@@ -129,7 +129,7 @@ function updateAdminCount() {
 }
 
 /**
- * Clears all active application timers. (NEW: P2)
+ * Clears all active application timers. (P2)
  * Ensures a clean state before resets or reloads.
  */
 function clearAllTimers() {
@@ -137,10 +137,8 @@ function clearAllTimers() {
         clearTimeout(appState.inactivityTimer);
         appState.inactivityTimer = null;
     }
-    if (appState.postSubmitResetTimer) {
-        clearTimeout(appState.postSubmitResetTimer);
-        appState.postSubmitResetTimer = null;
-    }
+    // Removed postSubmitResetTimer clear, as that variable is now unused/local
+    
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
         appState.rotationInterval = null;
@@ -351,7 +349,7 @@ function autoSync() {
 }
 
 function submitSurvey() {
-    // P2: Clear all timers immediately to stop background activity
+    // P2: Clear all timers immediately to stop background activity (inactivity, periodic sync)
     clearAllTimers(); 
 
     // --- Step 1: Queue the Completed Survey ---
@@ -365,20 +363,34 @@ function submitSurvey() {
     // Uses safeSetLocalStorage (P1)
     safeSetLocalStorage('submissionQueue', submissionQueue);
 
-    // 1. Show thank you message immediately
-    questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
+    // 1. Show thank you message immediately with initial countdown element
+    questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey!</h2>' +
+                                  '<p id="resetCountdown" class="mt-4 text-gray-500 text-lg font-semibold">Kiosk resetting in 5 seconds...</p>';
     
-    // Button remains ENABLED (Previous fix)
     prevBtn.disabled = true; 
+    nextBtn.disabled = true; 
     
-    // 2. Schedule the fast, reliable reset
-    appState.postSubmitResetTimer = setTimeout(() => {
-        // P3: Ensure the next session gets a fresh UUID by forcing a full state rebuild.
-        appState.currentQuestionIndex = 0; 
+    // 2. Start the visible countdown and the reliable reset (NEW LOGIC)
+    let timeLeft = RESET_DELAY_MS / 1000;
+    
+    const countdownInterval = setInterval(() => {
+        timeLeft--;
+        const countdownEl = document.getElementById('resetCountdown');
         
-        localStorage.removeItem('surveyAppState'); 
-        window.location.reload(); 
-    }, RESET_DELAY_MS); 
+        if (countdownEl) {
+            countdownEl.textContent = `Kiosk resetting in ${timeLeft} seconds...`;
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(countdownInterval);
+            
+            // P3: Ensure the next session gets a fresh UUID by forcing a full state rebuild.
+            appState.currentQuestionIndex = 0; 
+            
+            localStorage.removeItem('surveyAppState'); 
+            window.location.reload(); 
+        }
+    }, 1000);
 }
 
 
