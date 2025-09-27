@@ -1,3 +1,4 @@
+/* --- kiosk-survey.css (Updated for Disabled Button Visibility) --- */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
@@ -5,6 +6,8 @@
     --sewa-blue: #004d99;
     --error-red: #dc2626; /* Tailwind Red 600 equivalent for consistency */
     --focus-blue: #2563eb; /* A standard focus color for non-orange elements */
+    --disabled-bg: #e5e7eb; /* Tailwind gray-200 */
+    --disabled-text: #9ca3af; /* Tailwind gray-400 */
 }
 
 body {
@@ -22,15 +25,25 @@ body {
     padding: 0;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
-    white-space: nowrap; /* Ensures text is not wrapped */
+    white-space: nowrap;
     border: 0;
 }
 
-/* --- Form Element Base Styling --- */
-/* Add focus style for accessibility and consistency */
-input:focus, textarea:focus, button:focus, label:focus-within { /* Added focus-within for label groups */
+/* --- Form Element Base Styling & Focus --- */
+input:focus, textarea:focus, button:focus, label:focus-within {
     outline: 2px solid var(--sewa-orange);
     outline-offset: 2px;
+}
+
+/* --- FIX: Ensure Disabled Button is Readable --- */
+/* This overrides potentially conflicting browser/Tailwind defaults for the :disabled state. */
+button:disabled {
+    background-color: var(--disabled-bg) !important;
+    color: var(--disabled-text) !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+    /* This fix ensures white text on the button (like Next/Submit) turns dark when disabled. */
 }
 
 /* --- Custom Field Styling and Selection --- */
@@ -44,12 +57,11 @@ input:focus, textarea:focus, button:focus, label:focus-within { /* Added focus-w
 /* Selected state for Emoji & Number Scale */
 .emoji-radio-group input:checked + label,
 .number-scale-group input:checked + label {
-    /* Use strong blue as the selection color for contrast against Orange buttons (Next/Submit) */
-    border-color: var(--focus-blue); 
+    border-color: var(--focus-blue);
     background-color: #eff6ff; /* Light blue background for selection */
-    transform: scale(1.05); /* Slight bounce, adjusted from 1.1 to 1.05 */
+    transform: scale(1.05);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1), 0 0 0 2px var(--focus-blue);
-    color: #333; /* Keep text color readable */
+    color: #333;
 }
 
 /* Selected state for Location Radio Group */
@@ -64,17 +76,13 @@ input:focus, textarea:focus, button:focus, label:focus-within { /* Added focus-w
 .star-rating input {
     display: none;
 }
-.star-rating label.star { /* Target the label element with class 'star' */
-    color: #ccc; /* Default grey color */
+.star-rating label.star {
+    color: #ccc;
     transition: color 0.2s;
 }
-
-/* Checked stars and stars preceding the checked one should be highlighted */
 .star-rating input:checked ~ label.star {
-    color: #ffc107; /* Gold/Yellow for checked state */
+    color: #ffc107;
 }
-
-/* Hover effect: highlight current star and all preceding stars */
 .star-rating label.star:hover,
 .star-rating label.star:hover ~ label.star {
     color: #ffc107;
@@ -86,26 +94,24 @@ input:focus, textarea:focus, button:focus, label:focus-within { /* Added focus-w
     max-height: 0;
     overflow: hidden;
     pointer-events: none;
-    transition: opacity 0.4s ease-in-out, max-height 0.4s ease-in-out; /* Increased duration for smoother effect */
+    transition: opacity 0.4s ease-in-out, max-height 0.4s ease-in-out;
 }
 .visible-fields {
     opacity: 1;
-    max-height: 500px; /* Adjusted a practical max height for field content */
+    max-height: 500px;
     pointer-events: auto;
     transition: opacity 0.4s ease-in-out, max-height 0.4s ease-in-out;
 }
 
 /* --- Validation and Error States --- */
 .has-error {
-    border-color: var(--error-red) !important; 
+    border-color: var(--error-red) !important;
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
-
-/* **NEW ADDITION: Error Message Style** */
 .error-message {
-    display: block; /* Ensure it's rendered as a block element */
+    display: block;
     color: var(--error-red);
-    font-size: 0.875rem; /* text-sm equivalent */
+    font-size: 0.875rem;
     margin-top: 0.25rem;
 }
 
@@ -124,8 +130,8 @@ input:focus, textarea:focus, button:focus, label:focus-within { /* Added focus-w
     border-radius: 50%;
     border: 4px solid rgba(255, 255, 255, 0.3);
     border-top-color: #fff;
-    width: 20px; /* Ensure size is defined */
-    height: 20px; /* Ensure size is defined */
+    width: 20px;
+    height: 20px;
     animation: spin 1s ease-in-out infinite;
 }
 
