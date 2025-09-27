@@ -1,4 +1,4 @@
-// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED) ---
+// --- survey-app.js (VERSION 4: Offline Queue & Fast Reset) ---
 
 // --- UTILITIES & STATE MANAGEMENT ---
 // Function to generate a simple UUID (NEW UTILITY)
@@ -10,11 +10,11 @@ function generateUUID() {
 }
 // ---------------------------------------------------------------------
 
-// 1. GLOBAL STATE DEFINITION (UPDATED: ID generated at start)
+// 1. GLOBAL STATE DEFINITION (UPDATED: Removed sync_status from appState)
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    // CRITICAL FIX 1: Generate UUID here, ensuring it's the very first data point.
-    formData: { id: generateUUID(), timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
+    // ID is generated here. The 'sync_status' will now live only on the queue records.
+    formData: { id: generateUUID(), timestamp: new Date().toISOString() }, 
     inactivityTimer: null,
     syncTimer: null,
     rotationInterval: null, 
@@ -22,7 +22,7 @@ const DEFAULT_STATE = {
     adminClickCount: 0 
 };
 
-// Retrieve state from LocalStorage or use default
+// Retrieve IN-PROGRESS state from LocalStorage or use default
 const savedState = JSON.parse(localStorage.getItem('surveyAppState'));
 const appState = { 
     ...DEFAULT_STATE, 
@@ -42,9 +42,9 @@ let questionContainer, nextBtn, prevBtn,
 // ---------------------------------------------------------------------
 // --- UTILITIES & STATE MANAGEMENT ---
 // ---------------------------------------------------------------------
-// (generateUUID function is now above for clarity)
 
 function saveState() {
+    // Saves the IN-PROGRESS survey only.
     localStorage.setItem('surveyAppState', JSON.stringify({
         currentQuestionIndex: appState.currentQuestionIndex,
         formData: appState.formData
@@ -54,7 +54,7 @@ function saveState() {
 function updateData(key, value) {
     if (appState.formData[key] !== value) {
         appState.formData[key] = value;
-        appState.formData.sync_status = 'unsynced';
+        // NOTE: No sync_status update here, as that is only tracked on the final queued item.
         saveState();
     }
 }
@@ -66,9 +66,11 @@ function clearErrors() {
     });
 }
 
+// --- NEW/REVISED: Admin Counter now checks the submission queue ---
 function countUnsyncedRecords() {
-    // Only checks the current record's sync status
-    return appState.formData.sync_status === 'unsynced' ? 1 : 0;
+    // REVISED 2: Count the records in the submission queue
+    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+    return submissionQueue.length;
 }
 
 function updateAdminCount() {
@@ -87,7 +89,7 @@ function updateAdminCount() {
 }
 
 // ---------------------------------------------------------------------
-// --- VALIDATION & NAVIGATION (REVERTED TO PREVIOUS WORKING VERSION) ---
+// --- VALIDATION & NAVIGATION (Unchanged from previous version) ---
 // ---------------------------------------------------------------------
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
@@ -162,8 +164,6 @@ function showQuestion(index) {
         questionContainer.innerHTML = renderer.render(q, appState.formData);
         
         if (renderer.setupEvents) {
-            // NOTE ON FIX #5/7: The innerHTML replacement *should* remove old listeners 
-            // from elements inside the container. We trust the renderers for now.
             renderer.setupEvents(q, { 
                 handleNextQuestion: goNext, 
                 updateData: updateData 
@@ -214,37 +214,39 @@ function goPrev() {
 
 
 // ---------------------------------------------------------------------
-// --- SYNC & SUBMISSION LOGIC ---
+// --- SYNC & SUBMISSION LOGIC (HEAVILY REVISED) ---
 // ---------------------------------------------------------------------
 
-/** * Silent Sync Logic: Performs API call with retries. 
+/** * Silent Sync Logic: Performs API call with retries and processes the entire queue. 
  * showAdminFeedback flag determines if status messages are displayed in the Admin Panel.
  */
 async function syncData(showAdminFeedback = false) {
-    if (appState.formData.sync_status !== 'unsynced') {
+    // REVISED 2: Read the entire queue
+    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+
+    if (submissionQueue.length === 0) {
         if (showAdminFeedback && syncStatusMessage) {
-            syncStatusMessage.textContent = 'Already Synced ✅';
+            syncStatusMessage.textContent = 'No records to sync ✅';
             setTimeout(() => syncStatusMessage.textContent = '', 3000);
         }
         return true;
     }
-    
+
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 2000;
     let lastError = null;
 
     if (showAdminFeedback && syncStatusMessage) {
-        syncStatusMessage.textContent = 'Syncing... ⏳';
+        syncStatusMessage.textContent = `Syncing ${submissionQueue.length} records... ⏳`;
     }
 
-    // FIX 1: Wrap the single form data into the 'submissions' array structure the server expects.
+    // REVISED 2: The payload is the entire queue array.
     const payload = {
-        submissions: [appState.formData] 
+        submissions: submissionQueue 
     };
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // FIX 2: Correct the API endpoint URL from '/api/survey-sync' to the actual file path.
             const response = await fetch('/api/submit-survey', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -252,16 +254,16 @@ async function syncData(showAdminFeedback = false) {
             });
 
             if (!response.ok) {
+                // Important: Throw the error to trigger the retry loop
                 throw new Error(`Server returned status: ${response.status}`);
             }
             
-            // Success: Update status and counter
-            appState.formData.sync_status = 'synced';
-            saveState();
+            // SUCCESS: The server has the data, so we can now safely clear the local queue.
+            localStorage.removeItem('submissionQueue');
             updateAdminCount(); 
             
             if (showAdminFeedback && syncStatusMessage) {
-                syncStatusMessage.textContent = 'Manual Sync Successful ✅';
+                syncStatusMessage.textContent = `Sync Successful (${submissionQueue.length} records cleared) ✅`;
                 setTimeout(() => syncStatusMessage.textContent = '', 3000);
             }
             return true;
@@ -275,8 +277,8 @@ async function syncData(showAdminFeedback = false) {
     }
 
     // Failure: Log to console and update admin counter
-    console.error(`SILENT FAIL: Data sync failed permanently. Error: ${lastError.message}`);
-    updateAdminCount(); 
+    console.error(`PERMANENT FAIL: Data sync failed. Error: ${lastError.message}`);
+    updateAdminCount(); // This still ensures the admin panel shows the failure count
     
     if (showAdminFeedback && syncStatusMessage) {
         syncStatusMessage.textContent = 'Manual Sync Failed ⚠️ (Check Console)';
@@ -286,20 +288,25 @@ async function syncData(showAdminFeedback = false) {
 }
 
 function autoSync() {
-    // Background sync runs silently (default argument is false)
+    // Runs in the background, non-blocking.
     syncData(false);
 }
 
 function submitSurvey() {
-    // FIX 3 START: Decouple sync from reset. Let the periodic/manual sync handle the data.
-    
-    // CRITICAL: Ensure the current timestamp is final before we reset the kiosk.
-    // The ID is now generated in DEFAULT_STATE.
-    updateData('timestamp', new Date().toISOString());
-    
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
-    if (appState.syncTimer) clearInterval(appState.syncTimer);
+    // Note: Do NOT stop appState.syncTimer here, let the periodic sync keep running.
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
+
+    // --- NEW LOGIC: Queue the Completed Survey (Step 1) ---
+    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+    
+    // CRITICAL: Ensure the current timestamp is final before queuing.
+    appState.formData.timestamp = new Date().toISOString();
+    // Add a status flag to the queued item for future debugging, if needed.
+    appState.formData.sync_status = 'unsynced';
+    
+    submissionQueue.push(appState.formData);
+    localStorage.setItem('submissionQueue', JSON.stringify(submissionQueue));
 
     // 1. Show thank you message immediately
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
@@ -308,17 +315,15 @@ function submitSurvey() {
     
     // 2. Schedule the fast, reliable reset
     appState.postSubmitResetTimer = setTimeout(() => {
-        // The data remains saved in localStorage (unsynced) until the autoSync or manual sync runs.
+        // IMPORTANT: Clear only the IN-PROGRESS state, leaving the queue intact.
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
     }, 5000); 
-
-    // FIX 3 END
 }
 
 
 // ---------------------------------------------------------------------
-// --- TIMERS & UX (Updated for Two-Way Auto-Reset) ---
+// --- TIMERS & UX (Updated for Fast Reset) ---
 // ---------------------------------------------------------------------
 
 function resetInactivityTimer() {
@@ -331,20 +336,25 @@ function resetInactivityTimer() {
         const isInProgress = appState.currentQuestionIndex > 0;
         
         if (isInProgress) {
-              console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
-              
-              // CRITICAL: Finalize data before reset, ID is already present from initial state.
-              updateData('timestamp', new Date().toISOString());
+             console.log('Mid-survey inactivity detected. Auto-saving and resetting kiosk.');
+             
+             // --- NEW LOGIC: Queue the Abandoned Survey (Step 1) ---
+             const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+             
+             // CRITICAL: Finalize data before reset, ID is already present from initial state.
+             appState.formData.timestamp = new Date().toISOString();
+             appState.formData.sync_status = 'unsynced (inactivity)';
+             
+             submissionQueue.push(appState.formData);
+             localStorage.setItem('submissionQueue', JSON.stringify(submissionQueue));
 
-              saveState(); 
-              autoSync(); // Runs in the background, doesn't block the reset
-              
-              localStorage.removeItem('surveyAppState');
-              window.location.reload();
+             // --- Step 3: Fast Reset (autoSync is removed from here) ---
+             localStorage.removeItem('surveyAppState');
+             window.location.reload();
         } else {
-              // Only save/sync if not in progress (i.e., on the landing screen)
-              saveState();
-              autoSync();
+             // Only save/sync if not in progress (i.e., on the landing screen)
+             // On landing screen, we just rely on the periodic sync.
+             autoSync();
         }
     }, 300000); // 5 minutes
 }
@@ -393,11 +403,12 @@ function setupAdminAccess() {
         syncData(true); 
     });
     
-    // Clear Local Data Button
+    // Clear Local Data Button (REVISED: Now clears the queue too)
     adminClearButton.addEventListener('click', () => {
-        if (confirm("WARNING: Are you sure you want to delete ALL local survey data? This is permanent.")) {
-            // Clear the local state and reload to a fresh start
+        if (confirm("WARNING: Are you sure you want to delete ALL local survey data (Queue AND In-Progress)? This is permanent.")) {
+            // Clear the IN-PROGRESS state and the SUBMISSION QUEUE
             localStorage.removeItem('surveyAppState');
+            localStorage.removeItem('submissionQueue'); // NEW LINE
             window.location.reload();
         }
     });
