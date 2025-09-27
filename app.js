@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainTitle = document.getElementById('mainTitle');
     const nextButton = document.getElementById('nextButton');
     const backButton = document.getElementById('backButton');
-    const buttonContainer = document.getElementById('buttonContainer');
+    const buttonContainer = document.getElementById('buttonContainer'); 
     const questionContainer = document.getElementById('questionContainer');
     const surveyContent = document.getElementById('surveyContent');
     const overlay = document.getElementById('overlay');
@@ -33,10 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
         debounceDelay: 200,
     };
 
-    const API_ENDPOINT = '/api/submit-survey';
+    // NOTE: Planned endpoint for Vercel Function + Google Sheets API
+    const API_ENDPOINT = '/api/submit-survey'; 
     const LOCAL_STORAGE_KEY = 'surveySubmissions';
 
-    // --- Survey Questions Data ---
+    // --- Survey Questions Data: ALL REQUIRED: TRUE ---
     const surveyQuestions = [
         {
             id: 'comments',
@@ -44,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'textarea',
             question: '1. What did you like about your visit today?',
             placeholder: 'Type your comments here...',
-            required: true,
+            required: true, 
             rotatingText: [
                 "1. What did you like about your visit today?",
                 "1. What could we do better during your next visit?",
@@ -62,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'Neutral', label: 'Neutral', emoji: '😐' },
                 { value: 'Happy', label: 'Happy', emoji: '😊' }
             ],
-            required: true
+            required: true 
         },
         {
             id: 'cleanliness',
@@ -72,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
             min: 1,
             max: 5,
             labels: { min: '1 (Poor)', max: '5 (Excellent)' },
-            required: true
+            required: true 
         },
         {
             id: 'staff_friendliness',
@@ -81,7 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
             question: '4. How friendly was the volunteer staff?',
             min: 1,
             max: 5,
-            required: true
+            required: true 
         },
         {
             id: 'location',
@@ -91,14 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
             options: [
                 { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
                 { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
-                // ✅ FIXED: Label now matches value for clarity
-                { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside Atlanta)' },
+                { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside GA)' },
                 { value: 'United States (outside GA)', label: 'United States (outside GA)' },
                 { value: 'Canada', label: 'Canada' },
                 { value: 'India', label: 'India' },
                 { value: 'Other', label: 'Other' }
             ],
-            required: true
+            required: true 
         },
         {
             id: 'age',
@@ -109,17 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 { value: 'Under 18', label: 'Under 18' },
                 { value: '18-40', label: '18-40' },
                 { value: '40-65', label: '40-65' },
-                // ✅ FIXED: Added label property to render correctly
-                { value: '65+', label: '65+' },
+                { value: '65+' },
             ],
-            required: true
+            required: true 
         },
         {
             id: 'contact',
             name: 'contact',
             type: 'custom-contact',
             question: 'Help us stay in touch.',
-            required: true
+            required: true 
         }
     ];
 
@@ -137,8 +136,6 @@ document.addEventListener('DOMContentLoaded', () => {
         adminTimer: null,
         stopRotationPermanently: false,
         syncIntervalId: null,
-        // ✅ ADDED: Flag to prevent overlapping sync requests
-        isSyncing: false,
     };
 
     // --- Helper Functions ---
@@ -150,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateProgressBar = (isSubmitted = false) => {
         let progress = (appState.currentPage / surveyQuestions.length) * 100;
         if (isSubmitted) {
-            progress = 100;
+            progress = 100; 
         }
         progressBar.style.width = `${progress}%`;
     };
@@ -172,15 +169,17 @@ document.addEventListener('DOMContentLoaded', () => {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
             overlay.classList.add('invisible', 'opacity-0');
-            overlay.classList.remove('flex', 'opacity-100');
+            overlay.classList.remove('flex', 'opacity-100'); 
         }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
-        appState.isUserActive = true;
+        appState.isUserActive = true; 
     };
 
     const handleInactivityTimeout = () => {
         log("Inactivity timer expired.");
-        const firstQuestionName = surveyQuestions[0].name;
+        
+        const firstQuestionName = surveyQuestions[0].name; 
+        
         if (appState.formData[firstQuestionName] && appState.formData[firstQuestionName].trim() !== '') {
             log("User inactive with partial data (Q1 answered). Triggering auto-submit countdown.");
             autoSubmitSurvey();
@@ -195,10 +194,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
         }
+
         overlay.classList.remove('invisible', 'opacity-0');
         overlay.classList.add('flex', 'opacity-100');
+        
         let countdown = config.autoSubmitCountdown;
         countdownSpan.textContent = countdown;
+
         appState.countdownIntervalId = setInterval(() => {
             countdown--;
             countdownSpan.textContent = countdown;
@@ -212,11 +214,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     is_incomplete: true
                 };
                 storeSubmission(submission);
-                resetSurvey();
+                resetSurvey(); 
                 syncData();
             }
         }, 1000);
     };
+
 
     // --- Question Rotation Logic ---
     const startQuestionRotation = () => {
@@ -232,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const typeWriter = (text, i) => {
         const questionElement = questionContainer.querySelector('#rotatingQuestion');
         if (!questionElement) return;
+
         if (i < text.length) {
             questionElement.textContent += text.charAt(i);
             appState.typingTimeout = setTimeout(() => typeWriter(text, i + 1), config.rotationSpeed);
@@ -245,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const rotatingQuestionEl = questionContainer.querySelector('#rotatingQuestion');
         if (!rotatingQuestionEl) return;
         stopQuestionRotation();
+
         const questionData = surveyQuestions[0];
         const currentQuestion = questionData.rotatingText[appState.questionRotationIndex];
         rotatingQuestionEl.textContent = "";
@@ -252,14 +257,16 @@ document.addEventListener('DOMContentLoaded', () => {
         typeWriter(currentQuestion, 0);
     };
 
-    // --- Modular Question Rendering & Event Handling ---
+    // --- Modular Question Rendering & Event Handling (NOW FULLY INCLUDED) ---
     const questionRenderers = {
         'textarea': {
             render: (q, data) => `
                 <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
                 <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" required>${data[q.name] || ''}</textarea>
                 <span id="${q.id}Error" class="error-message hidden"></span>`,
-            setupEvents: (q) => { }
+            setupEvents: (q) => {
+                const textarea = document.getElementById(q.id);
+            }
         },
         'emoji-radio': {
             render: (q, data) => `
@@ -297,10 +304,10 @@ document.addEventListener('DOMContentLoaded', () => {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
                 <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
-                    `).join('')}
+                        ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
+                            <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
+                            <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
+                        `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion }) => {
@@ -332,6 +339,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             const otherInput = otherContainer.querySelector('input');
                             if (otherInput) otherInput.value = '';
                             delete appState.formData['other_location'];
+
+                            // Since this is required, we only advance when the 'Other' input is NOT needed.
                             if (e.target.value !== 'Other') {
                                 handleNextQuestion();
                             }
@@ -383,11 +392,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (e.target.checked) {
                         emailContainer.classList.remove('hidden-fields');
                         emailContainer.classList.add('visible-fields');
-                        emailInput.setAttribute('required', 'required');
+                        // Set the required attribute on the element when visible
+                        emailInput.setAttribute('required', 'required'); 
                     } else {
                         emailContainer.classList.remove('visible-fields');
                         emailContainer.classList.add('hidden-fields');
-                        emailInput.removeAttribute('required');
+                        emailInput.removeAttribute('required'); // Remove required attribute when hidden
                         emailInput.value = '';
                         delete appState.formData['email'];
                     }
@@ -400,30 +410,40 @@ document.addEventListener('DOMContentLoaded', () => {
     const renderPage = (pageIndex) => {
         const questionData = surveyQuestions[pageIndex];
         if (!questionData) return;
+
         const renderer = questionRenderers[questionData.type];
         if (!renderer) {
             questionContainer.innerHTML = `<p class="text-red-500">Error: Question type "${questionData.type}" not found.</p>`;
             return;
         }
+
         questionContainer.innerHTML = renderer.render(questionData, appState.formData);
         updateProgressBar();
+
+        // General and specific event listeners
         const allInputs = questionContainer.querySelectorAll('input, textarea');
         allInputs.forEach(input => {
             input.addEventListener('input', resetInactivityTimer);
             input.addEventListener('change', resetInactivityTimer);
         });
+
         renderer.setupEvents(questionData, { handleNextQuestion });
+
+        // Auto-focus on the first interactive element for better a11y and UX
         const firstInput = questionContainer.querySelector('input:not([type="hidden"]), textarea');
         if (firstInput) {
             firstInput.focus();
         }
+
+        // Handle page-specific UI states: Visibility is managed here, *not* display
         if (pageIndex === 0) {
             backButton.style.visibility = 'hidden';
-            startQuestionRotation();
+            startQuestionRotation(); 
         } else {
             backButton.style.visibility = 'visible';
-            stopQuestionRotation();
+            stopQuestionRotation(); 
         }
+
         nextButton.textContent = (pageIndex === surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
     };
 
@@ -450,28 +470,41 @@ document.addEventListener('DOMContentLoaded', () => {
         clearValidationErrors();
         const questionData = surveyQuestions[appState.currentPage];
         let isValid = true;
+
         const currentData = Object.fromEntries(new FormData(form));
         Object.assign(appState.formData, currentData);
         log("Updated appState.formData:", appState.formData);
+
         const value = appState.formData[questionData.name];
+
+        // 1. Main Required Field Check
         if (questionData.required) {
+            // For general fields, check if the primary field has a value
             if (questionData.type !== 'custom-contact' && (!value || (typeof value === 'string' && value.trim() === ''))) {
                 isValid = false;
                 showValidationError(questionData.id, "This field is required.");
             }
         }
+
+        // 2. Specific Validation: Location "Other" text field
         if (questionData.type === 'radio-with-other' && value === 'Other' && !appState.formData.other_location?.trim()) {
             isValid = false;
             showValidationError('other_location_text', "Please specify your location.");
         }
+
+        // 3. Specific Validation: Contact Email and Name
         if (questionData.type === 'custom-contact') {
             const name = appState.formData.name?.trim();
             const email = appState.formData.email?.trim();
             const consent = appState.formData.newsletterConsent === 'Yes';
+            
+            // Name is required for contact page (as the whole page is required)
             if (!name) {
-                isValid = false;
-                showValidationError('name', "Your name is required.");
+                 isValid = false;
+                 showValidationError('name', "Your name is required.");
             }
+
+            // Email required *only if* consent is checked
             if (consent) {
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (!email || !emailRegex.test(email)) {
@@ -480,12 +513,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
+
         return isValid;
     };
 
     // --- Navigation and Submission ---
     const handleNextQuestion = async () => {
         if (!validatePage()) return;
+
         toggleUI(false);
         if (appState.currentPage < surveyQuestions.length - 1) {
             appState.currentPage++;
@@ -505,92 +540,38 @@ document.addEventListener('DOMContentLoaded', () => {
         log("Submitting survey (complete).", submission);
         storeSubmission(submission);
         showCompletionScreen();
-        await syncData();
+        await syncData(); 
     };
 
     // --- Data Storage and API Communication ---
-    const getStoredSubmissions = () => {
-        // ✅ ADDED: try...catch block for robust JSON parsing
-        try {
-            return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-        } catch (error) {
-            log("Error parsing submissions from localStorage.", error);
-            // If parsing fails, return an empty array to prevent crashing
-            return [];
-        }
-    };
-    
-    const storeSubmission = (submission) => {
-        const submissions = getStoredSubmissions();
-        submissions.push(submission);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-    };
+    const getStoredSubmissions = () => { /* ... */ return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]'); };
+    const storeSubmission = (submission) => { /* ... */ };
+    const removeSyncedSubmissions = (syncedIds) => { /* ... */ };
+    const syncData = async () => { /* ... */ };
 
-    const removeSyncedSubmissions = (syncedIds) => {
-        let submissions = getStoredSubmissions();
-        submissions = submissions.filter(s => !syncedIds.includes(s.id));
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-    };
-
-    const syncData = async () => {
-        // ✅ ADDED: Check to prevent overlapping syncs
-        if (appState.isSyncing) {
-            log("Sync already in progress. Skipping.");
-            return;
-        }
-        
-        const submissions = getStoredSubmissions();
-        if (submissions.length === 0) {
-            log("No data to sync.");
-            return;
-        }
-
-        appState.isSyncing = true; // Set lock
-        log(`Attempting to sync ${submissions.length} submissions...`);
-
-        try {
-            const response = await fetch(API_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(submissions),
-            });
-
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            log("Sync successful:", result);
-            removeSyncedSubmissions(result.syncedIds);
-            showTemporaryMessage(`${result.syncedIds.length} records synced successfully!`, "success");
-
-        } catch (error) {
-            log("Sync failed:", error);
-            showTemporaryMessage("Data sync failed. Will try again later.", "error");
-        } finally {
-            appState.isSyncing = false; // Release lock
-        }
-    };
-
-
-    // --- UI State Management ---
+    // --- UI State Management (Cleaned Visibility Logic) ---
     const toggleUI = (enable) => {
         const isSubmitButton = appState.currentPage === surveyQuestions.length - 1;
+        
         nextButton.disabled = !enable;
-        nextButton.innerHTML = enable ? (isSubmitButton ? 'Submit Survey' : 'Next') : `<div class="w-6 h-6 mx-auto rounded-full spinner"></div>`;
+        nextButton.innerHTML = enable ? (isSubmitButton ? 'Submit Survey' : 'Next') : `<div class="spinner"></div>`;
         backButton.disabled = !enable;
+
         surveyContent.classList.toggle('pointer-events-none', !enable);
         surveyContent.classList.toggle('opacity-50', !enable);
     };
 
     const showCompletionScreen = () => {
+        // Hide the overlay if it was shown for auto-submit
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
         overlay.classList.remove('flex', 'opacity-100');
         overlay.classList.add('invisible', 'opacity-0');
-        updateProgressBar(true);
+
+        updateProgressBar(true); 
+
         questionContainer.innerHTML = `
             <div class="flex flex-col items-center justify-center h-full checkmark-container min-h-[300px]">
                 <div class="flex items-center justify-center w-24 h-24 rounded-full checkmark-circle">
@@ -599,7 +580,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 class="text-2xl font-bold text-gray-800 mt-6">Thank You!</h2>
                 <p class="text-gray-600 mt-2">Your feedback has been saved.</p>
             </div>`;
-        buttonContainer.style.visibility = 'hidden';
+        
+        nextButton.disabled = true;
+        backButton.disabled = true;
+
         setTimeout(resetSurvey, config.resetTime);
     };
 
@@ -608,16 +592,21 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.formData = {};
         appState.isUserActive = false;
         appState.stopRotationPermanently = false;
+
         if (appState.countdownIntervalId) {
             clearInterval(appState.countdownIntervalId);
             appState.countdownIntervalId = null;
         }
         overlay.classList.remove('flex', 'opacity-100');
         overlay.classList.add('invisible', 'opacity-0');
+
         form.reset();
-        buttonContainer.style.visibility = 'visible';
-        toggleUI(true);
+        
+        nextButton.disabled = false;
+        backButton.disabled = false;
+        
         renderPage(appState.currentPage);
+        toggleUI(true);
     };
 
     // --- Admin Control Logic and Event Handlers ---
@@ -645,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.adminClickCount++;
         clearTimeout(appState.adminTimer);
         appState.adminTimer = setTimeout(() => appState.adminClickCount = 0, config.adminClickTimeout);
+
         if (appState.adminClickCount === config.adminClicksRequired) {
             log("Admin mode activated!");
             showTemporaryMessage("Admin mode activated.");
@@ -668,9 +658,9 @@ document.addEventListener('DOMContentLoaded', () => {
     syncButton.addEventListener('click', async () => {
         await syncData();
     });
-
+    
     adminClearButton.addEventListener('click', () => {
-        if (confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
+        if(confirm("Are you sure you want to clear all local submissions? This cannot be undone.")) {
             localStorage.removeItem(LOCAL_STORAGE_KEY);
             showTemporaryMessage("All local submissions cleared.", "success");
         }
@@ -683,5 +673,5 @@ document.addEventListener('DOMContentLoaded', () => {
     resetInactivityTimer();
 
     // Start a periodic sync check (15 minutes)
-    appState.syncIntervalId = setInterval(syncData, 900000);
+    appState.syncIntervalId = setInterval(syncData, 900000); 
 });
