@@ -1,6 +1,6 @@
-// --- survey-app.js (VERSION 5: Robust Kiosk Final) ---
+// --- survey-app.js (VERSION 6: Q1 Button Visibility Fix) ---
 
-// --- CONFIGURATION CONSTANTS (NEW) ---
+// --- CONFIGURATION CONSTANTS ---
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 2000;
 const INACTIVITY_TIMEOUT_MS = 300000; // 5 minutes
@@ -22,8 +22,6 @@ function generateUUID() {
 
 /**
  * Safely retrieves and parses a JSON item from localStorage.
- * @param {string} key - The localStorage key.
- * @returns {any | null} The parsed data or null if invalid/missing.
  */
 function safeGetLocalStorage(key) {
     const item = localStorage.getItem(key);
@@ -38,10 +36,33 @@ function safeGetLocalStorage(key) {
 
 /**
  * Safely retrieves the submission queue. (NEW UTILITY)
- * @returns {Array<Object>} The submission queue array, or an empty array if invalid/missing.
  */
 function getSubmissionQueue() {
     return safeGetLocalStorage('submissionQueue') || [];
+}
+
+/**
+ * NEW: Attaches an 'input' listener to a text field to immediately enable the Next button.
+ * This forces the button to adopt its correct orange/white styling, bypassing CSS conflicts.
+ * The button is ENABLED by default, so this just ensures a visual refresh.
+ */
+function refreshNextButtonOnInput(inputId) {
+    const inputField = document.getElementById(inputId);
+    const nextBtn = document.getElementById('nextBtn');
+    
+    if (!inputField || !nextBtn) return;
+
+    // The handler function simply ensures the button's state is explicitly 'enabled'.
+    const enableButtonHandler = () => {
+        nextBtn.disabled = false;
+        // Optionally, check length > 0, but for this visual fix, just the 'input' event is enough.
+    };
+
+    // Attach listener to run the check every time the input changes
+    inputField.addEventListener('input', enableButtonHandler);
+    
+    // Run once immediately in case the user reloads with saved text
+    enableButtonHandler();
 }
 // ---------------------------------------------------------------------
 
@@ -56,12 +77,11 @@ const DEFAULT_STATE = {
     adminClickCount: 0 
 };
 
-// Retrieve IN-PROGRESS state safely (UPDATED to use safeGetLocalStorage)
+// Retrieve IN-PROGRESS state safely
 const savedState = safeGetLocalStorage('surveyAppState');
 const appState = { 
     ...DEFAULT_STATE, 
     ...(savedState ? { 
-        // We only persist the index and form data for in-progress surveys
         currentQuestionIndex: savedState.currentQuestionIndex || 0, 
         formData: savedState.formData || DEFAULT_STATE.formData 
     } : {})
@@ -101,7 +121,6 @@ function clearErrors() {
 }
 
 function countUnsyncedRecords() {
-    // Uses the new safe getter
     return getSubmissionQueue().length;
 }
 
@@ -195,6 +214,16 @@ function showQuestion(index) {
 
         questionContainer.innerHTML = renderer.render(q, appState.formData);
         
+        // --- ADDED FIX LOGIC FOR Q1 INTERACTIVITY ---
+        if (index === 0 && q.type === 'text') { 
+            // Delay slightly to ensure the HTML element has rendered, then attach listener
+            setTimeout(() => { 
+                refreshNextButtonOnInput(q.name); // Assuming input ID is q.name
+            }, 50); 
+        }
+        // --- END ADDED FIX LOGIC ---
+
+
         if (renderer.setupEvents) {
             renderer.setupEvents(q, { 
                 handleNextQuestion: goNext, 
@@ -208,7 +237,8 @@ function showQuestion(index) {
         
         prevBtn.disabled = index === 0;
         nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-        nextBtn.disabled = false;
+        nextBtn.disabled = false; // Always enabled here
+        
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
         questionContainer.innerHTML = '<h2 class="text-xl font-bold text-red-600">A critical error occurred. Please refresh.</h2>';
