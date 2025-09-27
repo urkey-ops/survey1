@@ -1,4 +1,4 @@
-// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED URL) ---
+// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED) ---
 
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
@@ -238,7 +238,6 @@ async function syncData(showAdminFeedback = false) {
             });
 
             if (!response.ok) {
-                // If we get here, it means the 404 was fixed, but another server error occurred.
                 throw new Error(`Server returned status: ${response.status}`);
             }
             
@@ -278,20 +277,26 @@ function autoSync() {
 }
 
 function submitSurvey() {
-    syncData(); 
-
+    // FIX 3 START: Decouple sync from reset. Let the periodic/manual sync handle the data.
+    // The kiosk must prioritize being ready for the next user.
+    
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
 
+    // 1. Show thank you message immediately
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
+    // 2. Schedule the fast, reliable reset
     appState.postSubmitResetTimer = setTimeout(() => {
+        // The data remains saved in localStorage (unsynced) until the autoSync or manual sync runs.
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
     }, 5000); 
+
+    // FIX 3 END
 }
 
 
@@ -312,7 +317,7 @@ function resetInactivityTimer() {
               console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
               
               saveState(); 
-              autoSync();
+              autoSync(); // Runs in the background, doesn't block the reset
               
               localStorage.removeItem('surveyAppState');
               window.location.reload();
