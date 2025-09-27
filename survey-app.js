@@ -3,7 +3,8 @@
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    formData: { timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
+    // Add a unique ID to the form data to ensure each submission is trackable on the server and client
+    formData: { id: generateUUID(), timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
     inactivityTimer: null,
     syncTimer: null,
     rotationInterval: null, 
@@ -29,8 +30,16 @@ let questionContainer, nextBtn, prevBtn,
 
 
 // ---------------------------------------------------------------------
-// --- UTILITIES & STATE MANAGEMENT ---
+// --- UTILITIES & STATE MANAGEMENT (Updated) ---
 // ---------------------------------------------------------------------
+
+// Function to generate a simple UUID (NEW)
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
 
 function saveState() {
     localStorage.setItem('surveyAppState', JSON.stringify({
@@ -42,6 +51,7 @@ function saveState() {
 function updateData(key, value) {
     if (appState.formData[key] !== value) {
         appState.formData[key] = value;
+        // Keep the sync status set to unsynced whenever data changes
         appState.formData.sync_status = 'unsynced';
         saveState();
     }
@@ -200,7 +210,7 @@ function goPrev() {
 
 
 // ---------------------------------------------------------------------
-// --- SYNC & SUBMISSION LOGIC (Updated for Admin Feedback) ---
+// --- SYNC & SUBMISSION LOGIC (Updated for ID and Reset Reliability) ---
 // ---------------------------------------------------------------------
 
 /** * Silent Sync Logic: Performs API call with retries. 
@@ -230,7 +240,7 @@ async function syncData(showAdminFeedback = false) {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // FIX 2: Correct the API endpoint URL from '/api/survey-sync' to the actual file path.
+            // FIX 2: Correct the API endpoint URL
             const response = await fetch('/api/submit-survey', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -277,6 +287,12 @@ function autoSync() {
 }
 
 function submitSurvey() {
+    // CRITICAL: Ensure the current submission has a unique ID before being archived locally.
+    // This addresses the data integrity and ensures a clear record for the server.
+    if (!appState.formData.id) {
+        updateData('id', generateUUID()); 
+    }
+    
     // FIX 3 START: Decouple sync from reset. Let the periodic/manual sync handle the data.
     // The kiosk must prioritize being ready for the next user.
     
@@ -307,6 +323,7 @@ function submitSurvey() {
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
     
+    // The postSubmitResetTimer is handled outside of inactivity, so we keep this clear
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
 
     appState.inactivityTimer = setTimeout(() => {
@@ -316,6 +333,11 @@ function resetInactivityTimer() {
         if (isInProgress) {
               console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
               
+              // CRITICAL: Generate ID for incomplete survey before saving/syncing
+              if (!appState.formData.id) {
+                  updateData('id', generateUUID()); 
+              }
+
               saveState(); 
               autoSync(); // Runs in the background, doesn't block the reset
               
