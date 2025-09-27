@@ -1,4 +1,4 @@
-// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED) ---
+// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED URL) ---
 
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
@@ -223,23 +223,22 @@ async function syncData(showAdminFeedback = false) {
         syncStatusMessage.textContent = 'Syncing... ⏳';
     }
 
-    // *** FIX START: Create the payload structure the server expects ***
-    // The server expects an object with a 'submissions' property which is an array.
+    // FIX 1: Wrap the single form data into the 'submissions' array structure the server expects.
     const payload = {
         submissions: [appState.formData] 
     };
-    // *** FIX END ***
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const response = await fetch('/api/survey-sync', {
+            // FIX 2: Correct the API endpoint URL from '/api/survey-sync' to the actual file path.
+            const response = await fetch('/api/submit-survey', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // Use the correctly formatted payload
                 body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
+                // If we get here, it means the 404 was fixed, but another server error occurred.
                 throw new Error(`Server returned status: ${response.status}`);
             }
             
