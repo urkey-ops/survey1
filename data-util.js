@@ -1,4 +1,4 @@
-// --- data-util.js ---
+// --- data-util.js (Reverted to Original Questions) ---
 
 // 1. QUESTION DATA STRUCTURE
 const surveyQuestions = [
