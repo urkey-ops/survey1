@@ -1,6 +1,4 @@
-// --- Core Application Logic ---
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Element References ---
     const form = document.getElementById('surveyForm');
     const statusMessage = document.getElementById('statusMessage');
     const syncButton = document.getElementById('syncButton');
@@ -13,8 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const surveyContent = document.getElementById('surveyContent');
     const overlay = document.getElementById('overlay');
     const countdownSpan = document.getElementById('countdown');
+    const cancelButton = document.getElementById('cancelButton');
+    const progressBar = document.getElementById('progressBar');
 
-    const LOCAL_STORAGE_KEY = 'surveySubmissions';
     const config = {
         rotationSpeed: 50,
         rotationDisplayTime: 4000,
@@ -22,13 +21,28 @@ document.addEventListener('DOMContentLoaded', () => {
         adminClicksRequired: 5,
         adminClickTimeout: 3000,
         inactivityTime: 30000,
-        autoSubmitCountdown: 5
+        autoSubmitCountdown: 5,
     };
 
-    const DEBUG_MODE = true;
-    const log = (message, ...args) => DEBUG_MODE && console.log(`[DEBUG] ${message}`, ...args);
+    const LOCAL_STORAGE_KEY = 'surveySubmissions';
+    const surveyQuestions = [
+        {
+            id: 'comments',
+            name: 'comments',
+            type: 'textarea',
+            question: '1. What did you like about your visit today?',
+            placeholder: 'Type your comments here...',
+            required: true, 
+            rotatingText: [
+                "1. What did you like about your visit today?",
+                "1. What could we do better during your next visit?",
+                "1. Do you have any general comments or suggestions?",
+                "1. What was the most memorable part of your experience?"
+            ]
+        },
+        // ...other questions as defined earlier
+    ];
 
-    // --- App State ---
     const appState = {
         currentPage: 0,
         formData: {},
@@ -37,10 +51,10 @@ document.addEventListener('DOMContentLoaded', () => {
         displayTimeout: null,
         inactivityTimeout: null,
         countdownIntervalId: null,
+        isUserActive: false,
         adminClickCount: 0,
         adminTimer: null,
         stopRotationPermanently: false,
-        syncIntervalId: null
     };
 
     const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -48,219 +62,165 @@ document.addEventListener('DOMContentLoaded', () => {
         return v.toString(16);
     });
 
-    // --- LocalStorage & Sync ---
-    const getStoredSubmissions = () => JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-    const storeSubmission = (submission) => {
-        const submissions = getStoredSubmissions();
-        submissions.push(submission);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-        log("Stored submission locally:", submission);
-    };
-    const removeSyncedSubmissions = (syncedIds) => {
-        const submissions = getStoredSubmissions().filter(s => !syncedIds.includes(s.id));
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-    };
-    const syncData = async () => {
-        const submissions = getStoredSubmissions();
-        if (!submissions.length) return;
-        log("Syncing submissions:", submissions);
-
-        try {
-            // Dummy API call placeholder
-            // Replace with actual fetch/axios call in production
-            await new Promise(res => setTimeout(res, 500));
-
-            const syncedIds = submissions.map(s => s.id);
-            removeSyncedSubmissions(syncedIds);
-            showTemporaryMessage("All data synced successfully.", "success");
-        } catch (err) {
-            log("Sync failed:", err);
-            showTemporaryMessage("Sync failed. Will retry later.", "error");
-        }
-    };
-
-    // --- UI Helpers ---
     const updateProgressBar = (isSubmitted = false) => {
         let progress = (appState.currentPage / surveyQuestions.length) * 100;
         if (isSubmitted) progress = 100;
-        document.getElementById('progressBar').style.width = `${progress}%`;
-    };
-
-    const showTemporaryMessage = (message, type = 'info') => {
-        const className = type === 'error' ? 'bg-red-100 text-red-700' : (type === 'success' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700');
-        statusMessage.textContent = message;
-        statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
-        statusMessage.style.display = 'block';
-        setTimeout(() => statusMessage.style.display = 'none', 5000);
+        progressBar.style.width = `${progress}%`;
     };
 
     const resetInactivityTimer = () => {
         clearTimeout(appState.inactivityTimeout);
-        if (appState.countdownIntervalId) {
-            clearInterval(appState.countdownIntervalId);
-            appState.countdownIntervalId = null;
-            overlay.classList.add('invisible', 'opacity-0');
-            overlay.classList.remove('flex', 'opacity-100');
-        }
+        if(appState.countdownIntervalId) { clearInterval(appState.countdownIntervalId); overlay.classList.add('invisible','opacity-0'); overlay.classList.remove('flex','opacity-100'); }
         appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
+        appState.isUserActive = true;
     };
 
     const handleInactivityTimeout = () => {
-        const firstQ = surveyQuestions[0].name;
-        if (appState.formData[firstQ] && appState.formData[firstQ].trim()) {
-            autoSubmitSurvey();
-        } else {
-            resetSurvey();
-        }
-    };
-
-    const autoSubmitSurvey = () => {
-        if (appState.countdownIntervalId) clearInterval(appState.countdownIntervalId);
-        overlay.classList.remove('invisible', 'opacity-0');
-        overlay.classList.add('flex', 'opacity-100');
-
+        overlay.classList.remove('invisible','opacity-0'); 
+        overlay.classList.add('flex','opacity-100');
         let countdown = config.autoSubmitCountdown;
         countdownSpan.textContent = countdown;
+        cancelButton.classList.remove('hidden');
 
         appState.countdownIntervalId = setInterval(() => {
             countdown--;
             countdownSpan.textContent = countdown;
-            if (countdown <= 0) {
+            if(countdown <=0){
                 clearInterval(appState.countdownIntervalId);
-                appState.countdownIntervalId = null;
-
-                const submission = {
-                    id: uuidv4(),
-                    timestamp: new Date().toISOString(),
-                    data: appState.formData,
-                    is_incomplete: true
-                };
-                storeSubmission(submission);
-                resetSurvey();
-                syncData();
+                overlay.classList.add('invisible','opacity-0');
+                overlay.classList.remove('flex','opacity-100');
+                cancelButton.classList.add('hidden');
+                submitSurvey();
             }
-        }, 1000);
+        },1000);
     };
 
-    // --- Navigation ---
-    const toggleUI = (enable) => {
-        nextButton.disabled = !enable;
-        nextButton.innerHTML = enable ? (appState.currentPage === surveyQuestions.length - 1 ? 'Submit Survey' : 'Next') : `<div class="spinner"></div>`;
-        backButton.disabled = !enable;
-        surveyContent.classList.toggle('pointer-events-none', !enable);
-        surveyContent.classList.toggle('opacity-100', enable);
-        surveyContent.classList.toggle('opacity-50', !enable);
-    };
-
-    const showCompletionScreen = () => {
-        if (appState.countdownIntervalId) {
-            clearInterval(appState.countdownIntervalId);
-            appState.countdownIntervalId = null;
-        }
-        overlay.classList.add('invisible', 'opacity-0');
-        updateProgressBar(true);
-
-        questionContainer.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full checkmark-container min-h-[300px]">
-                <div class="flex items-center justify-center w-24 h-24 rounded-full checkmark-circle">
-                    <div class="text-white text-6xl checkmark-icon">✓</div>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800 mt-6">Thank You!</h2>
-                <p class="text-gray-600 mt-2">Your feedback has been saved.</p>
-            </div>
-        `;
-
-        nextButton.disabled = true;
-        backButton.disabled = true;
-        setTimeout(resetSurvey, config.resetTime);
-    };
-
-    const resetSurvey = () => {
-        appState.currentPage = 0;
-        appState.formData = {};
-        appState.stopRotationPermanently = false;
-        if (appState.countdownIntervalId) clearInterval(appState.countdownIntervalId);
-
-        overlay.classList.add('invisible', 'opacity-0');
-        overlay.classList.remove('flex', 'opacity-100');
-
-        form.reset();
-        nextButton.disabled = false;
-        backButton.disabled = false;
-
-        renderPage(appState.currentPage);
-        toggleUI(true);
+    cancelButton.addEventListener('click', () => {
+        clearInterval(appState.countdownIntervalId);
+        overlay.classList.add('invisible','opacity-0');
+        overlay.classList.remove('flex','opacity-100');
+        cancelButton.classList.add('hidden');
         resetInactivityTimer();
-    };
-
-    const handleNextQuestion = async () => {
-        if (!validatePage()) return;
-
-        toggleUI(false);
-        if (appState.currentPage < surveyQuestions.length - 1) {
-            appState.currentPage++;
-            renderPage(appState.currentPage);
-            toggleUI(true);
-        } else {
-            const submission = {
-                id: uuidv4(),
-                timestamp: new Date().toISOString(),
-                data: appState.formData
-            };
-            storeSubmission(submission);
-            showCompletionScreen();
-            await syncData();
-        }
-    };
-
-    // --- Event Listeners ---
-    nextButton.addEventListener('click', handleNextQuestion);
-    backButton.addEventListener('click', () => {
-        if (appState.currentPage > 0) {
-            appState.currentPage--;
-            renderPage(appState.currentPage);
-        }
     });
+
+    document.addEventListener('mousemove', resetInactivityTimer);
+    document.addEventListener('keydown', resetInactivityTimer);
 
     mainTitle.addEventListener('click', () => {
         appState.adminClickCount++;
         clearTimeout(appState.adminTimer);
-        appState.adminTimer = setTimeout(() => appState.adminClickCount = 0, config.adminClickTimeout);
-
-        if (appState.adminClickCount === config.adminClicksRequired) {
-            showTemporaryMessage("Admin mode activated.");
-            syncButton.classList.remove('hidden');
+        appState.adminTimer = setTimeout(() => { appState.adminClickCount = 0; }, config.adminClickTimeout);
+        if(appState.adminClickCount >= config.adminClicksRequired){
             adminClearButton.classList.remove('hidden');
+            syncButton.classList.remove('hidden');
             hideAdminButton.classList.remove('hidden');
-            appState.adminClickCount = 0;
         }
     });
 
     hideAdminButton.addEventListener('click', () => {
-        syncButton.classList.add('hidden');
         adminClearButton.classList.add('hidden');
+        syncButton.classList.add('hidden');
         hideAdminButton.classList.add('hidden');
-        showTemporaryMessage("Admin controls hidden.", "info");
+        appState.adminClickCount = 0;
     });
 
-    adminClearButton.addEventListener('click', () => {
-        if (confirm("Are you sure you want to clear all local submissions?")) {
-            localStorage.removeItem(LOCAL_STORAGE_KEY);
-            showTemporaryMessage("All local submissions cleared.", "success");
+    const renderPage = (index) => {
+        appState.currentPage = index;
+        questionContainer.innerHTML = '';
+        const q = surveyQuestions[index];
+        let fieldHTML = '';
+
+        switch(q.type){
+            case 'textarea':
+                fieldHTML = `
+                    <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.rotatingText[0]}</label>
+                    <textarea id="${q.id}" name="${q.name}" placeholder="${q.placeholder}" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-sewa-orange">${appState.formData[q.name] || ''}</textarea>
+                `;
+                break;
+            case 'star':
+                fieldHTML = `<div class="star-rating flex space-x-2 justify-center">`;
+                for(let i=5;i>=1;i--){
+                    fieldHTML += `<input type="radio" id="${q.name}_${i}" name="${q.name}" value="${i}" ${appState.formData[q.name]==i ? 'checked':''}>
+                    <label for="${q.name}_${i}" class="text-3xl cursor-pointer hover:text-yellow-400">★</label>`;
+                }
+                fieldHTML += `</div>`;
+                break;
+        }
+
+        questionContainer.innerHTML = fieldHTML;
+        updateProgressBar();
+        if(q.type === 'textarea') startQuestionRotation();
+    };
+
+    const rotateQuestions = () => {
+        if(appState.stopRotationPermanently) return;
+        const label = document.getElementById('rotatingQuestion');
+        if(!label) return;
+        const q = surveyQuestions[0];
+        const text = q.rotatingText[appState.questionRotationIndex % q.rotatingText.length];
+        let i=0;
+        label.textContent = '';
+        const typeLetter = () => {
+            if(i<text.length){
+                label.textContent += text[i];
+                i++;
+                appState.typingTimeout = setTimeout(typeLetter, config.rotationSpeed);
+            } else {
+                appState.displayTimeout = setTimeout(() => {
+                    appState.questionRotationIndex++;
+                    rotateQuestions();
+                }, config.rotationDisplayTime);
+            }
+        };
+        typeLetter();
+    };
+
+    const startQuestionRotation = () => {
+        appState.stopRotationPermanently = false;
+        rotateQuestions();
+    };
+
+    const validatePage = () => {
+        const q = surveyQuestions[appState.currentPage];
+        const val = document.querySelector(`[name="${q.name}"]`).value.trim();
+        if(q.required && !val){
+            statusMessage.textContent = 'Please answer this question.';
+            statusMessage.classList.remove('hidden');
+            return false;
+        }
+        statusMessage.classList.add('hidden');
+        return true;
+    };
+
+    const saveLocal = () => {
+        let data = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)||'[]');
+        const currentData = {...appState.formData, timestamp: Date.now()};
+        data.push(currentData);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    };
+
+    const submitSurvey = () => {
+        saveLocal();
+        appState.formData = {};
+        renderPage(0);
+        updateProgressBar(true);
+    };
+
+    nextButton.addEventListener('click', ()=>{
+        if(!validatePage()) return;
+        const q = surveyQuestions[appState.currentPage];
+        appState.formData[q.name] = document.querySelector(`[name="${q.name}"]`).value.trim();
+        if(appState.currentPage<surveyQuestions.length-1){
+            renderPage(appState.currentPage+1);
+        } else {
+            submitSurvey();
         }
     });
 
-    overlay.querySelector('#cancelButton').addEventListener('click', () => {
-        if (appState.countdownIntervalId) clearInterval(appState.countdownIntervalId);
-        overlay.classList.add('invisible', 'opacity-0');
-        overlay.classList.remove('flex', 'opacity-100');
-        resetInactivityTimer();
+    backButton.addEventListener('click', ()=>{
+        if(appState.currentPage>0) renderPage(appState.currentPage-1);
     });
 
-    // --- Initial Render ---
-    renderPage(appState.currentPage);
+    renderPage(0);
     resetInactivityTimer();
-
-    // Periodic Sync
-    appState.syncIntervalId = setInterval(syncData, 900000); // every 15 mins
 });
