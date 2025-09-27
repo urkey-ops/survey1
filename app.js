@@ -8,11 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextButton = document.getElementById('nextButton');
     const backButton = document.getElementById('backButton');
     const questionContainer = document.getElementById('questionContainer');
-    const surveyContent = document.getElementById('surveyContent');
     const overlay = document.getElementById('overlay');
     const countdownSpan = document.getElementById('countdown');
     const cancelButton = document.getElementById('cancelButton');
     const progressBar = document.getElementById('progressBar');
+
+    const LOCAL_STORAGE_KEY = 'surveySubmissions';
 
     const config = {
         rotationSpeed: 50,
@@ -24,7 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
         autoSubmitCountdown: 5,
     };
 
-    const LOCAL_STORAGE_KEY = 'surveySubmissions';
     const surveyQuestions = [
         {
             id: 'comments',
@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'textarea',
             question: '1. What did you like about your visit today?',
             placeholder: 'Type your comments here...',
-            required: true, 
+            required: true,
             rotatingText: [
                 "1. What did you like about your visit today?",
                 "1. What could we do better during your next visit?",
@@ -40,63 +40,175 @@ document.addEventListener('DOMContentLoaded', () => {
                 "1. What was the most memorable part of your experience?"
             ]
         },
-        // ...other questions as defined earlier
+        // ... other questions
     ];
 
-    const appState = {
+    const state = {
         currentPage: 0,
         formData: {},
-        questionRotationIndex: 0,
+        rotationIndex: 0,
         typingTimeout: null,
         displayTimeout: null,
         inactivityTimeout: null,
-        countdownIntervalId: null,
-        isUserActive: false,
+        countdownInterval: null,
         adminClickCount: 0,
         adminTimer: null,
-        stopRotationPermanently: false,
+        stopRotation: false,
     };
 
+    // -------------------
+    // UTILITIES
+    // -------------------
     const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
         const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
 
-    const updateProgressBar = (isSubmitted = false) => {
-        let progress = (appState.currentPage / surveyQuestions.length) * 100;
-        if (isSubmitted) progress = 100;
-        progressBar.style.width = `${progress}%`;
+    const saveLocal = () => {
+        let data = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+        const currentData = {...state.formData, timestamp: Date.now()};
+        data.push(currentData);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    };
+
+    const updateProgressBar = () => {
+        progressBar.style.width = `${((state.currentPage) / surveyQuestions.length) * 100}%`;
     };
 
     const resetInactivityTimer = () => {
-        clearTimeout(appState.inactivityTimeout);
-        if(appState.countdownIntervalId) { clearInterval(appState.countdownIntervalId); overlay.classList.add('invisible','opacity-0'); overlay.classList.remove('flex','opacity-100'); }
-        appState.inactivityTimeout = setTimeout(handleInactivityTimeout, config.inactivityTime);
-        appState.isUserActive = true;
+        clearTimeout(state.inactivityTimeout);
+        clearInterval(state.countdownInterval);
+        overlay.classList.add('invisible', 'opacity-0');
+        overlay.classList.remove('flex', 'opacity-100');
+
+        state.inactivityTimeout = setTimeout(triggerInactivityOverlay, config.inactivityTime);
     };
 
-    const handleInactivityTimeout = () => {
-        overlay.classList.remove('invisible','opacity-0'); 
+    // -------------------
+    // ROTATION LOGIC
+    // -------------------
+    const startRotation = () => {
+        if(state.stopRotation) return;
+        const q = surveyQuestions[0];
+        const label = document.getElementById('rotatingQuestion');
+        if(!label) return;
+
+        const text = q.rotatingText[state.rotationIndex % q.rotatingText.length];
+        label.textContent = '';
+
+        let i = 0;
+        const typeLetter = () => {
+            if(i < text.length){
+                label.textContent += text[i];
+                i++;
+                state.typingTimeout = setTimeout(typeLetter, config.rotationSpeed);
+            } else {
+                state.displayTimeout = setTimeout(() => {
+                    state.rotationIndex++;
+                    startRotation();
+                }, config.rotationDisplayTime);
+            }
+        };
+        typeLetter();
+    };
+
+    // -------------------
+    // RENDER LOGIC
+    // -------------------
+    const renderPage = (index) => {
+        state.currentPage = index;
+        const q = surveyQuestions[index];
+        questionContainer.innerHTML = '';
+        let html = '';
+
+        if(q.type === 'textarea'){
+            html = `<label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2">${q.rotatingText[0]}</label>
+                    <textarea id="${q.id}" name="${q.name}" placeholder="${q.placeholder}" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-sewa-orange">${state.formData[q.name] || ''}</textarea>`;
+            questionContainer.innerHTML = html;
+            if(index === 0) startRotation();
+        }
+
+        // Add other types here (star, number-scale, location, etc.)
+
+        updateProgressBar();
+    };
+
+    // -------------------
+    // VALIDATION
+    // -------------------
+    const validatePage = () => {
+        const q = surveyQuestions[state.currentPage];
+        const input = document.querySelector(`[name="${q.name}"]`);
+        if(q.required && input && !input.value.trim()){
+            statusMessage.textContent = 'Please answer this question.';
+            statusMessage.classList.remove('hidden');
+            return false;
+        }
+        statusMessage.classList.add('hidden');
+        return true;
+    };
+
+    // -------------------
+    // NAVIGATION
+    // -------------------
+    nextButton.addEventListener('click', () => {
+        if(!validatePage()) return;
+
+        // Save current page data
+        const q = surveyQuestions[state.currentPage];
+        const input = document.querySelector(`[name="${q.name}"]`);
+        if(input) state.formData[q.name] = input.value.trim();
+
+        if(state.currentPage < surveyQuestions.length - 1){
+            renderPage(state.currentPage + 1);
+        } else {
+            submitSurvey();
+        }
+        resetInactivityTimer();
+    });
+
+    backButton.addEventListener('click', () => {
+        if(state.currentPage > 0){
+            renderPage(state.currentPage - 1);
+        }
+        resetInactivityTimer();
+    });
+
+    // -------------------
+    // SUBMIT
+    // -------------------
+    const submitSurvey = () => {
+        saveLocal();
+        state.formData = {};
+        renderPage(0);
+        progressBar.style.width = '100%';
+    };
+
+    // -------------------
+    // INACTIVITY OVERLAY
+    // -------------------
+    const triggerInactivityOverlay = () => {
+        overlay.classList.remove('invisible','opacity-0');
         overlay.classList.add('flex','opacity-100');
         let countdown = config.autoSubmitCountdown;
         countdownSpan.textContent = countdown;
         cancelButton.classList.remove('hidden');
 
-        appState.countdownIntervalId = setInterval(() => {
+        state.countdownInterval = setInterval(() => {
             countdown--;
             countdownSpan.textContent = countdown;
-            if(countdown <=0){
-                clearInterval(appState.countdownIntervalId);
+            if(countdown <= 0){
+                clearInterval(state.countdownInterval);
                 overlay.classList.add('invisible','opacity-0');
                 overlay.classList.remove('flex','opacity-100');
                 cancelButton.classList.add('hidden');
                 submitSurvey();
             }
-        },1000);
+        }, 1000);
     };
 
     cancelButton.addEventListener('click', () => {
-        clearInterval(appState.countdownIntervalId);
+        clearInterval(state.countdownInterval);
         overlay.classList.add('invisible','opacity-0');
         overlay.classList.remove('flex','opacity-100');
         cancelButton.classList.add('hidden');
@@ -106,11 +218,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mousemove', resetInactivityTimer);
     document.addEventListener('keydown', resetInactivityTimer);
 
+    // -------------------
+    // ADMIN MODE
+    // -------------------
     mainTitle.addEventListener('click', () => {
-        appState.adminClickCount++;
-        clearTimeout(appState.adminTimer);
-        appState.adminTimer = setTimeout(() => { appState.adminClickCount = 0; }, config.adminClickTimeout);
-        if(appState.adminClickCount >= config.adminClicksRequired){
+        state.adminClickCount++;
+        clearTimeout(state.adminTimer);
+        state.adminTimer = setTimeout(() => state.adminClickCount = 0, config.adminClickTimeout);
+        if(state.adminClickCount >= config.adminClicksRequired){
             adminClearButton.classList.remove('hidden');
             syncButton.classList.remove('hidden');
             hideAdminButton.classList.remove('hidden');
@@ -121,106 +236,12 @@ document.addEventListener('DOMContentLoaded', () => {
         adminClearButton.classList.add('hidden');
         syncButton.classList.add('hidden');
         hideAdminButton.classList.add('hidden');
-        appState.adminClickCount = 0;
+        state.adminClickCount = 0;
     });
 
-    const renderPage = (index) => {
-        appState.currentPage = index;
-        questionContainer.innerHTML = '';
-        const q = surveyQuestions[index];
-        let fieldHTML = '';
-
-        switch(q.type){
-            case 'textarea':
-                fieldHTML = `
-                    <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.rotatingText[0]}</label>
-                    <textarea id="${q.id}" name="${q.name}" placeholder="${q.placeholder}" required class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-sewa-orange">${appState.formData[q.name] || ''}</textarea>
-                `;
-                break;
-            case 'star':
-                fieldHTML = `<div class="star-rating flex space-x-2 justify-center">`;
-                for(let i=5;i>=1;i--){
-                    fieldHTML += `<input type="radio" id="${q.name}_${i}" name="${q.name}" value="${i}" ${appState.formData[q.name]==i ? 'checked':''}>
-                    <label for="${q.name}_${i}" class="text-3xl cursor-pointer hover:text-yellow-400">★</label>`;
-                }
-                fieldHTML += `</div>`;
-                break;
-        }
-
-        questionContainer.innerHTML = fieldHTML;
-        updateProgressBar();
-        if(q.type === 'textarea') startQuestionRotation();
-    };
-
-    const rotateQuestions = () => {
-        if(appState.stopRotationPermanently) return;
-        const label = document.getElementById('rotatingQuestion');
-        if(!label) return;
-        const q = surveyQuestions[0];
-        const text = q.rotatingText[appState.questionRotationIndex % q.rotatingText.length];
-        let i=0;
-        label.textContent = '';
-        const typeLetter = () => {
-            if(i<text.length){
-                label.textContent += text[i];
-                i++;
-                appState.typingTimeout = setTimeout(typeLetter, config.rotationSpeed);
-            } else {
-                appState.displayTimeout = setTimeout(() => {
-                    appState.questionRotationIndex++;
-                    rotateQuestions();
-                }, config.rotationDisplayTime);
-            }
-        };
-        typeLetter();
-    };
-
-    const startQuestionRotation = () => {
-        appState.stopRotationPermanently = false;
-        rotateQuestions();
-    };
-
-    const validatePage = () => {
-        const q = surveyQuestions[appState.currentPage];
-        const val = document.querySelector(`[name="${q.name}"]`).value.trim();
-        if(q.required && !val){
-            statusMessage.textContent = 'Please answer this question.';
-            statusMessage.classList.remove('hidden');
-            return false;
-        }
-        statusMessage.classList.add('hidden');
-        return true;
-    };
-
-    const saveLocal = () => {
-        let data = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)||'[]');
-        const currentData = {...appState.formData, timestamp: Date.now()};
-        data.push(currentData);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-    };
-
-    const submitSurvey = () => {
-        saveLocal();
-        appState.formData = {};
-        renderPage(0);
-        updateProgressBar(true);
-    };
-
-    nextButton.addEventListener('click', ()=>{
-        if(!validatePage()) return;
-        const q = surveyQuestions[appState.currentPage];
-        appState.formData[q.name] = document.querySelector(`[name="${q.name}"]`).value.trim();
-        if(appState.currentPage<surveyQuestions.length-1){
-            renderPage(appState.currentPage+1);
-        } else {
-            submitSurvey();
-        }
-    });
-
-    backButton.addEventListener('click', ()=>{
-        if(appState.currentPage>0) renderPage(appState.currentPage-1);
-    });
-
+    // -------------------
+    // INIT
+    // -------------------
     renderPage(0);
     resetInactivityTimer();
 });
