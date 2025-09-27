@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
 :root {
     --sewa-orange: #ff6600;
     --sewa-blue: #004d99;
@@ -9,27 +11,21 @@ body {
     color: #333;
 }
 
-/* Next & Back buttons */
-#nextButton, #backButton {
-    display: inline-block;        /* Ensure visibility */
-    opacity: 1 !important;        /* Remove hover-only visibility */
+/* Visually hidden for accessibility */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
 
-/* Progress Bar */
-#progressBar {
-    transition: width 0.3s ease-in-out;
-}
-
-/* Question container animation */
-#rotatingQuestion {
-    display: inline-block;
-    white-space: pre-wrap;
-}
-
-/* Radio, emoji, number scale states */
+/* Selected emoji-radio and number-scale styles */
 .emoji-radio-group input:checked + label,
-.number-scale-group input:checked + label,
-.location-radio-group input:checked + label {
+.number-scale-group input:checked + label {
     border-color: var(--sewa-orange);
     background-color: #fff;
     transform: scale(1.1);
@@ -37,19 +33,43 @@ body {
     color: var(--sewa-orange);
 }
 
-/* Star rating */
+/* Labels hover and transition styles */
+.emoji-radio-group label,
+.number-scale-group label,
+.location-radio-group label {
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+/* Star rating styles */
+.star-rating input {
+    display: none;
+}
+.star-rating input:checked ~ label,
+.star-rating input:checked ~ label:hover,
+.star-rating input:checked ~ label:hover ~ label {
+    color: #ffc107;
+}
 .star-rating input:not(:checked) ~ label:hover,
-.star-rating input:checked ~ label {
+.star-rating input:not(:checked) ~ label:hover ~ label {
     color: #ffc107;
 }
 
-/* Hidden fields animation */
+/* Location radio group selected style */
+.location-radio-group input:checked + label {
+    background-color: var(--sewa-orange);
+    color: white;
+    border-color: var(--sewa-orange);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Hidden fields - animate height */
 .hidden-fields {
     opacity: 0;
     max-height: 0;
     overflow: hidden;
     pointer-events: none;
-    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out;
+    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out; 
 }
 .visible-fields {
     opacity: 1;
@@ -57,36 +77,86 @@ body {
     pointer-events: auto;
 }
 
-/* Error state */
+/* Error state style for inputs/containers */
 .has-error {
-    border-color: #dc2626 !important;
+    border-color: #dc2626 !important; 
     box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
 
-/* Checkmark */
+/* Checkmark animation styles */
+.checkmark-container {
+    min-height: 300px;
+}
 .checkmark-circle {
     background-color: #22c55e;
     animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
 }
+.checkmark-icon {
+    font-weight: bold;
+}
 
+/* BounceIn keyframes */
 @keyframes bounceIn {
     0% { transform: scale(0); opacity: 0; }
     60% { transform: scale(1.1); opacity: 1; }
     100% { transform: scale(1); }
 }
 
-/* Spinner */
+/* Spinner styles */
 .spinner {
-    border: 4px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #fff;
-    animation: spin 1s ease-in-out infinite;
-}
-@keyframes spin {
-    to { transform: rotate(360deg); }
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2563eb; /* Tailwind blue */
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
 }
 
-/* Focus outline */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Focus outline for accessibility */
 input:focus, textarea:focus, button:focus, label:focus {
     outline: 2px solid var(--sewa-orange);
     outline-offset: 2px;
+}
+
+/* --- Next / Back Button Fixes --- */
+#nextButton,
+#backButton {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transition: all 0.3s ease;
+}
+
+/* Disabled state */
+#nextButton:disabled,
+#backButton:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Hover/Focus effect for active buttons */
+#nextButton:not(:disabled):hover,
+#backButton:not(:disabled):hover,
+#nextButton:not(:disabled):focus,
+#backButton:not(:disabled):focus {
+    transform: translateY(-2px);
+}
+
+/* Ensure pointer-events and opacity on survey content during async */
+#surveyContent.pointer-events-none {
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+#surveyContent.opacity-100 {
+    opacity: 1;
 }
