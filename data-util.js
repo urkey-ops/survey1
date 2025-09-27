@@ -1,168 +1,190 @@
-//data-util.js
-// data-util.js
+/*
+|--------------------------------------------------------------------------
+| Survey Data and Utility Functions (data-util.js)
+|--------------------------------------------------------------------------
+| This file holds all hardcoded survey content, configuration, and client-side 
+| utility functions for logging, storage, and synchronization.
+*/
 
 // --- Configuration ---
-const DEBUG_MODE = true;
-export const log = (message, ...args) => DEBUG_MODE && console.log(`[DEBUG] ${message}`, ...args);
-
 export const config = {
-    rotationSpeed: 50,
-    rotationDisplayTime: 4000,
-    resetTime: 5000,
-    adminClicksRequired: 5,
-    adminClickTimeout: 3000,
-    inactivityTime: 30000,
-    autoSubmitCountdown: 5,
-    debounceDelay: 200,
+    // UI Settings
+    inactivityTime: 60000, // 60 seconds of inactivity before warning
+    autoSubmitCountdown: 10, // Seconds before auto-submitting
+    adminClicksRequired: 7, // Number of clicks to enable admin menu
+    adminClickTimeout: 3000, // Time window for admin clicks (3 seconds)
+    
+    // Question Rotation Settings (For Q1)
+    rotationInterval: 5000, // Time between starting the typewriter effect
+    rotationDisplayTime: 4000, // Time to display text before next rotation
+    rotationSpeed: 50, // Typing speed (ms per character)
 };
 
-// NOTE: Planned endpoint for Vercel Function + Google Sheets API
-export const API_ENDPOINT = '/api/submit-survey'; 
-export const LOCAL_STORAGE_KEY = 'surveySubmissions';
-
-// --- Survey Questions Data: ALL REQUIRED: TRUE ---
+// --- Survey Questions (Complete List: 5 Questions for Q1 -> Q5 Flow) ---
 export const surveyQuestions = [
     {
-        id: 'comments',
-        name: 'comments',
+        id: 'q1',
+        name: 'satisfaction_text',
         type: 'textarea',
-        question: '1. What did you like about your visit today?',
-        placeholder: 'Type your comments here...',
-        required: true, 
+        question: 'How was your experience today?',
+        placeholder: 'Tell us more about your visit...',
+        required: true,
+        // The first question has rotating text for the idle screen
         rotatingText: [
-            "1. What did you like about your visit today?",
-            "1. What could we do better during your next visit?",
-            "1. Do you have any general comments or suggestions?",
-            "1. What was the most memorable part of your experience?"
+            "We value your feedback!",
+            "How was your experience today?",
+            "What can we do better?",
+            "Click here to share your thoughts."
         ]
     },
     {
-        id: 'satisfaction',
-        name: 'satisfaction',
+        id: 'q2',
+        name: 'store_rating',
         type: 'emoji-radio',
-        question: '2. Overall, how satisfied were you with your visit today?',
+        question: 'Overall, how would you rate your visit?',
+        required: true,
         options: [
-            { value: 'Sad', label: 'Sad', emoji: '😞' },
-            { value: 'Neutral', label: 'Neutral', emoji: '😐' },
-            { value: 'Happy', label: 'Happy', emoji: '😊' }
-        ],
-        required: true 
-    },
-    // ... include the rest of your surveyQuestions objects here ...
-    {
-        id: 'location',
-        name: 'location',
-        type: 'radio-with-other',
-        question: 'Where are you visiting from today?',
-        options: [
-            { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
-            { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
-            { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside GA)' },
-            { value: 'United States (outside GA)', label: 'United States (outside GA)' },
-            { value: 'Canada', label: 'Canada' },
-            { value: 'India', label: 'India' },
-            { value: 'Other', label: 'Other' }
-        ],
-        required: true 
+            { value: 'bad', emoji: '😞', label: 'Bad' },
+            { value: 'poor', emoji: '😟', label: 'Poor' },
+            { value: 'neutral', emoji: '😐', label: 'Neutral' },
+            { value: 'good', emoji: '😊', label: 'Good' },
+            { value: 'excellent', emoji: '🤩', label: 'Excellent' }
+        ]
     },
     {
-        id: 'age',
-        name: 'age',
+        id: 'q3',
+        name: 'reason_rating',
         type: 'radio',
-        question: 'Which age group do you belong to?',
+        question: 'What was the main reason for your rating?',
+        required: true,
         options: [
-            { value: 'Under 18', label: 'Under 18' },
-            { value: '18-40', label: '18-40' },
-            { value: '40-65', label: '40-65' },
-            { value: '65+' },
-        ],
-        required: true 
+            { value: 'service', label: 'Staff Service' },
+            { value: 'product_quality', label: 'Product Quality' },
+            { value: 'cleanliness', label: 'Store Cleanliness' },
+            { value: 'atmosphere', label: 'Atmosphere/Environment' },
+        ]
     },
     {
-        id: 'contact',
-        name: 'contact',
+        id: 'q4',
+        name: 'recommendation_other',
+        type: 'radio-with-other', // Requires logic in app.js to handle the 'other' text input
+        question: 'Would you recommend us to a friend?',
+        required: true,
+        options: [
+            { value: 'yes', label: 'Yes, definitely' },
+            { value: 'no', label: 'No, not now' },
+            { value: 'maybe', label: 'Maybe' },
+            { value: 'other', label: 'Other (please specify)' }
+        ]
+    },
+    {
+        id: 'q5',
+        name: 'contact_info',
         type: 'custom-contact',
-        question: 'Help us stay in touch.',
-        required: true 
+        question: 'If you would like a follow-up, please provide your email:',
+        placeholder: 'Enter your email address',
+        required: false,
     }
 ];
-// --- Helper Functions ---
-export const uuidv4 = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-});
 
-export const showTemporaryMessage = (message, type = 'info') => {
-    const statusMessage = document.getElementById('statusMessage');
-    const className = type === 'error' ? 'bg-red-100 text-red-700' : (type === 'success' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700');
-    statusMessage.textContent = message;
-    statusMessage.className = `block p-4 mb-4 rounded-xl text-center font-medium ${className}`;
-    statusMessage.style.display = 'block';
-    setTimeout(() => {
-        statusMessage.style.display = 'none';
-    }, 5000);
+// --- Utility Functions ---
+
+/**
+ * Simple logging utility (can be replaced by a more robust solution later)
+ * @param {string} message 
+ * @param {any} data 
+ */
+export const log = (message, data = null) => {
+    console.log(`[Kiosk Survey] ${message}`, data || '');
 };
 
-// --- Data Storage and API Communication ---
-export const getStoredSubmissions = () => JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+/**
+ * Generates a simple UUID (v4-like)
+ * @returns {string}
+ */
+export const uuidv4 = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
 
+/**
+ * Stores a survey submission in local storage.
+ * @param {Object} submission 
+ */
 export const storeSubmission = (submission) => {
-    const submissions = getStoredSubmissions();
-    submissions.push(submission);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-    showTemporaryMessage(`Submission saved locally. Queue size: ${submissions.length}.`, 'info');
-};
-
-export const removeSyncedSubmissions = (syncedIds) => {
-    let submissions = getStoredSubmissions();
-    const beforeCount = submissions.length;
-    submissions = submissions.filter(sub => !syncedIds.includes(sub.id));
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(submissions));
-    log(`Removed ${beforeCount - submissions.length} synced submissions. Remaining: ${submissions.length}`);
-};
-
-export const syncData = async () => {
-    const submissions = getStoredSubmissions();
-    if (submissions.length === 0) {
-        log("No data to sync.");
-        showTemporaryMessage("Sync successful (0 items).", 'success');
-        return;
-    }
-
-    log(`Attempting to sync ${submissions.length} submissions...`);
-    showTemporaryMessage(`Syncing ${submissions.length} submissions...`, 'info');
-
     try {
-        const response = await fetch(API_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ submissions })
-        });
-
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        
-        const result = await response.json();
-        
-        if (result.success && result.syncedIds.length > 0) {
-            removeSyncedSubmissions(result.syncedIds);
-            showTemporaryMessage(`Successfully synced ${result.syncedIds.length} submissions!`, 'success');
-        } else {
-             showTemporaryMessage("Sync failed on server side, check server logs.", 'error');
-        }
-
-    } catch (error) {
-        console.error('Sync failed:', error);
-        showTemporaryMessage("Network error during sync. Data saved locally.", 'error');
+        const submissions = JSON.parse(localStorage.getItem('surveySubmissions') || '[]');
+        submissions.push(submission);
+        localStorage.setItem('surveySubmissions', JSON.stringify(submissions));
+        log(`Submission stored locally. Total: ${submissions.length}`);
+        showTemporaryMessage("Feedback saved locally!", "success");
+    } catch (e) {
+        log("Error storing submission locally:", e);
+        showTemporaryMessage("Error saving feedback.", "error");
     }
 };
 
-// --- Admin Logic (needs a slight adjustment to be exported) ---
-export const hideAdminControls = () => {
-    const syncButton = document.getElementById('syncButton');
-    const adminClearButton = document.getElementById('adminClearButton');
-    const hideAdminButton = document.getElementById('hideAdminButton');
-    syncButton.classList.add('hidden');
-    adminClearButton.classList.add('hidden');
-    hideAdminButton.classList.add('hidden');
-    showTemporaryMessage("Admin controls hidden.", "info");
+/**
+ * Placeholder for data synchronization logic (sends data to server/GSheet)
+ */
+export const syncData = async () => {
+    log("Attempting to sync data...");
+    // In a real application, this is where a fetch() call to the Vercel 
+    // function would happen to push data to Google Sheets.
+    
+    // Dummy Success/Failure simulation
+    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    
+    showTemporaryMessage("Sync functionality is currently a placeholder.", "info");
 };
+
+/**
+ * Displays a temporary status message to the user.
+ * @param {string} message 
+ * @param {string} type 'success', 'error', or 'info'
+ */
+export const showTemporaryMessage = (message, type = 'info') => {
+    const statusMessageElement = document.getElementById('statusMessage');
+    if (!statusMessageElement) return;
+
+    // Remove previous classes
+    statusMessageElement.classList.remove('bg-green-100', 'bg-red-100', 'bg-blue-100', 'text-green-800', 'text-red-800', 'text-blue-800', 'hidden');
+
+    // Set new classes based on type
+    switch (type) {
+        case 'success':
+            statusMessageElement.classList.add('bg-green-100', 'text-green-800');
+            break;
+        case 'error':
+            statusMessageElement.classList.add('bg-red-100', 'text-red-800');
+            break;
+        case 'info':
+        default:
+            statusMessageElement.classList.add('bg-blue-100', 'text-blue-800');
+            break;
+    }
+
+    statusMessageElement.textContent = message;
+    
+    setTimeout(() => {
+        statusMessageElement.classList.add('hidden');
+    }, 4000); 
+};
+
+
+/**
+ * Hides admin buttons after use.
+ */
+export const hideAdminControls = () => {
+    const refs = {
+        syncButton: document.getElementById('syncButton'),
+        adminClearButton: document.getElementById('adminClearButton'),
+        hideAdminButton: document.getElementById('hideAdminButton')
+    };
+    if (refs.syncButton) refs.syncButton.classList.add('hidden');
+    if (refs.adminClearButton) refs.adminClearButton.classList.add('hidden');
+    if (refs.hideAdminButton) refs.hideAdminButton.classList.add('hidden');
+    log("Admin controls hidden.");
+}
