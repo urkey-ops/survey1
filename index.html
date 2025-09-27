@@ -13,6 +13,8 @@
         <header class="bg-gray-50 border-b border-gray-200 py-4 px-6 flex justify-between items-center relative">
             <h1 id="mainTitle" class="text-xl font-bold text-gray-800 cursor-pointer">Customer Feedback</h1>
             
+            <div id="sync-status-indicator" class="absolute top-0 right-0 p-2 text-sm font-bold text-gray-500"></div>
+            
             <div class="absolute inset-x-0 bottom-0">
                 <div id="progressBarContainer" class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div id="progressBar" class="h-full bg-sewa-blue rounded-full transition-all duration-300 ease-in-out" style="width: 0;"></div>
@@ -33,8 +35,8 @@
             </form>
             
             <div id="buttonContainer" class="flex justify-between items-center pt-4">
-                <button id="backButton" type="button" class="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl shadow hover:bg-gray-300 transition-colors">Back</button>
-                <button id="nextButton" type="button" class="px-6 py-3 bg-sewa-orange text-white font-bold rounded-xl shadow hover:bg-orange-600 transition-colors">Next</button>
+                <button id="prevBtn" type="button" class="px-6 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl shadow hover:bg-gray-300 transition-colors">Back</button>
+                <button id="nextBtn" type="button" class="px-6 py-3 bg-sewa-orange text-white font-bold rounded-xl shadow hover:bg-orange-600 transition-colors">Next</button>
             </div>
         </section>
 
@@ -46,7 +48,7 @@
         </div>
     </main>
 
-    <script src="data-util.js" type="module"></script>
-    <script src="survey-app.js" type="module"></script>
+    <script src="data-util.js"></script>
+    <script src="survey-app.js"></script>
 </body>
 </html>
