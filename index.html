@@ -18,6 +18,8 @@
                 <p id="unsyncedCountDisplay" class="text-xs font-semibold text-green-600">Unsynced Records: 0</p>
                 
                 <div class="flex items-center space-x-2">
+                    <span id="syncStatusMessage" class="text-xs font-medium text-gray-700"></span> 
+                    
                     <button id="syncButton" class="px-3 py-1 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors">Sync Data</button>
                     <button id="adminClearButton" class="px-3 py-1 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors">Clear Local</button>
                     <button id="hideAdminButton" class="px-3 py-1 bg-gray-500 text-white text-sm font-medium rounded-lg hover:bg-gray-600 transition-colors">Hide</button>
@@ -30,7 +32,7 @@
                 </div>
             </div>
             
-            </header>
+        </header>
 
         <section id="surveyContent" class="p-6 sm:p-8 flex-1 flex flex-col justify-center">
             <div id="statusMessage" class="hidden"></div>
