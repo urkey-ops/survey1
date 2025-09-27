@@ -10,7 +10,6 @@
 </head>
 <body class="min-h-screen flex items-center justify-center p-4 sm:p-8">
     <main class="w-full max-w-2xl bg-white rounded-2xl shadow-xl overflow-hidden min-h-[500px] flex flex-col">
-        <!-- HEADER -->
         <header class="bg-gray-50 border-b border-gray-200 py-4 px-6 flex justify-between items-center relative">
             <h1 id="mainTitle" class="text-xl font-bold text-gray-800 cursor-pointer">Customer Feedback</h1>
             
@@ -27,7 +26,6 @@
             </div>
         </header>
 
-        <!-- SURVEY CONTENT -->
         <section id="surveyContent" class="p-6 sm:p-8 flex-1 flex flex-col justify-center">
             <div id="statusMessage" class="hidden"></div>
             <form id="surveyForm" class="space-y-6 flex-1 flex flex-col" novalidate>
@@ -40,15 +38,15 @@
             </div>
         </section>
 
-        <!-- AUTO-SUBMIT OVERLAY -->
         <div id="overlay" class="fixed inset-0 bg-white/90 flex flex-col justify-center items-center opacity-0 invisible transition duration-500 ease-in-out z-50">
             <div class="p-8 bg-white rounded-lg shadow-xl text-center">
                 <p id="overlayMessage" class="text-xl font-bold mb-4">Survey auto-submitting in <span id="countdown">5</span> seconds...</p>
-                <button id="cancelButton" class="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors hidden">Cancel</button>
+                <button id="cancelButton" class="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors">Cancel</button>
             </div>
         </div>
     </main>
 
-    <script src="app.js" defer></script>
+    <script src="data-util.js" type="module"></script>
+    <script src="survey-app.js" type="module"></script>
 </body>
 </html>
