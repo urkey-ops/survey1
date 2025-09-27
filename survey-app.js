@@ -1,13 +1,14 @@
-// --- survey-app.js (Final Production & Resilient Version) ---
+// --- survey-app.js (Final Production & Resilient Version with Auto-Reset) ---
 
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    // Add timestamp for unique ID/ordering and sync_status for offline-first tracking
     formData: { timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
     inactivityTimer: null,
     syncTimer: null,
-    rotationInterval: null, // Timer reference for rotation cleanup
+    rotationInterval: null, 
+    // New: Timer for the post-submission reset delay
+    postSubmitResetTimer: null
 };
 
 // Retrieve state from LocalStorage or use default
@@ -76,12 +77,11 @@ function updateSyncStatusUI(status) {
             color = 'text-gray-500';
     }
     syncStatusIndicator.textContent = text;
-    // Note: Tailwind classes are assumed to exist in your environment
     syncStatusIndicator.className = `absolute top-0 right-0 p-2 text-sm font-bold ${color}`;
 }
 
 
-// --- VALIDATION LOGIC ---
+// --- VALIDATION LOGIC (UNCHANGED) ---
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
 
@@ -91,7 +91,6 @@ function validateQuestion(q) {
     let isValid = true;
     let errorMessage = '';
 
-    // Helper to display error safely
     const displayError = (id, message) => {
         const errorEl = document.getElementById(id);
         if (errorEl) {
@@ -102,13 +101,11 @@ function validateQuestion(q) {
         }
     };
 
-    // A. Check basic required fields 
     if (q.required && (!answer || (typeof answer === 'string' && answer.trim() === ''))) {
         errorMessage = 'This response is required.';
         isValid = false;
     }
 
-    // B. Handle 'radio-with-other' validation
     if (q.type === 'radio-with-other' && answer === 'Other') {
         const otherValue = appState.formData['other_location'];
         if (!otherValue || otherValue.trim() === '') {
@@ -117,7 +114,6 @@ function validateQuestion(q) {
         }
     }
     
-    // C. Handle custom-contact validation
     if (q.type === 'custom-contact') {
         const consent = appState.formData['newsletterConsent'] === 'Yes';
         const name = appState.formData['name'];
@@ -143,9 +139,8 @@ function validateQuestion(q) {
 }
 
 
-// --- NAVIGATION & RENDERING ---
+// --- NAVIGATION & RENDERING (UNCHANGED) ---
 
-/** Ensures no rotation intervals are running, preventing memory leaks. */
 function cleanupIntervals() {
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
@@ -188,8 +183,7 @@ function goNext() {
         return; 
     }
 
-    cleanupIntervals(); // Clear rotation interval before navigation
-    
+    cleanupIntervals();
     clearErrors();
     
     if (appState.currentQuestionIndex < window.dataUtils.surveyQuestions.length - 1) {
@@ -203,7 +197,7 @@ function goNext() {
 
 function goPrev() {
     if (appState.currentQuestionIndex > 0) {
-        cleanupIntervals(); // Clear rotation interval before navigation
+        cleanupIntervals();
         
         appState.currentQuestionIndex--;
         saveState();
@@ -214,9 +208,6 @@ function goPrev() {
 
 // --- SYNC & SUBMISSION LOGIC ---
 
-/** * Handles API sync with retry mechanism (Vercel Function + Google Sheets API).
- * Attempts to sync data up to MAX_RETRIES times for kiosk resilience.
- */
 async function syncData() {
     if (appState.formData.sync_status !== 'unsynced') {
         return true;
@@ -230,7 +221,6 @@ async function syncData() {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // API Call to your Vercel Function endpoint
             const response = await fetch('/api/survey-sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -254,11 +244,8 @@ async function syncData() {
         }
     }
 
-    // Final Failure Handling
     console.error(`Data sync failed permanently after ${MAX_RETRIES} attempts. Error: ${lastError.message}`);
     updateSyncStatusUI('failed');
-    
-    // Notify the admin/user (critical for kiosk operation)
     alert("CRITICAL WARNING: Data sync failed after multiple retries. Data is safe locally, but requires manual attention (check network/server log).");
     
     return false;
@@ -268,29 +255,63 @@ function autoSync() {
     syncData();
 }
 
+/**
+ * Handles survey submission and triggers an immediate auto-reset.
+ */
 function submitSurvey() {
+    // Attempt final sync
     syncData(); 
 
-    // Final cleanup of all timers
+    // Final cleanup of background timers
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
+    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); // Clear any pending resets
 
-    questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Data is saved locally and syncing.</h2>';
+    // Display thank you message
+    questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
-    // OPTIONAL: Uncomment to reset the kiosk for the next user immediately.
-    // localStorage.removeItem('surveyAppState'); 
+    // **NEW IMPLEMENTATION 1: Auto-Reset after Completion**
+    appState.postSubmitResetTimer = setTimeout(() => {
+        // Clear the saved state and force a fresh reload to Q1
+        localStorage.removeItem('surveyAppState'); 
+        window.location.reload(); 
+    }, 5000); // 5-second delay for user to read the message
 }
 
 
 // --- TIMERS & UX ---
 
+/**
+ * Resets inactivity timer; handles mid-survey auto-reset if inactive for too long.
+ */
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
+    
+    // Clear any pending post-submission reset if user interacts
+    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
+
     appState.inactivityTimer = setTimeout(() => {
-        saveState(); 
-        autoSync(); 
+        // **NEW IMPLEMENTATION 2: Auto-Reset Mid-Survey on Inactivity**
+        
+        // 1. If the current question index is > 0, the user has started the survey.
+        const isInProgress = appState.currentQuestionIndex > 0;
+        
+        // 2. If it's in progress, save partially filled data and sync it.
+        if (isInProgress) {
+             console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
+             saveState(); 
+             autoSync();
+             
+             // 3. Force reset immediately after saving partial data
+             localStorage.removeItem('surveyAppState');
+             window.location.reload();
+        } else {
+             // If they were on Q1 and did nothing, just save the default state and continue periodic sync
+             saveState();
+             autoSync();
+        }
     }, 300000); // 5 minutes
 }
 
@@ -304,7 +325,7 @@ function rotateQuestionText(q) {
     const labelEl = document.getElementById('rotatingQuestion');
     if (!labelEl) return;
     
-    cleanupIntervals(); // Clear existing rotation interval
+    cleanupIntervals();
     
     appState.rotationInterval = setInterval(() => {
         idx = (idx + 1) % q.rotatingText.length;
@@ -313,12 +334,10 @@ function rotateQuestionText(q) {
 }
 
 
-// --- INITIALIZATION FIX (CRITICAL) ---
+// --- INITIALIZATION (CRITICAL - UNCHANGED) ---
 
-// Wait for the entire HTML document to be loaded before accessing elements.
 document.addEventListener('DOMContentLoaded', () => {
     
-    // 1. Assign DOM elements (must match HTML IDs exactly: questionContainer, nextBtn, prevBtn)
     questionContainer = document.getElementById('questionContainer');
     nextBtn = document.getElementById('nextBtn');
     prevBtn = document.getElementById('prevBtn');
@@ -329,13 +348,16 @@ document.addEventListener('DOMContentLoaded', () => {
         return; 
     }
 
-    // 2. Event listeners 
     nextBtn.addEventListener('click', goNext);
     prevBtn.addEventListener('click', goPrev);
     document.addEventListener('mousemove', resetInactivityTimer);
     document.addEventListener('keydown', resetInactivityTimer);
 
-    // 3. Start the application flow
+    // If the app is loaded right after a submission, the reset timer might still be running.
+    // Ensure all timers are clear on load.
+    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
+
+    // Start the application flow
     showQuestion(appState.currentQuestionIndex);
     resetInactivityTimer();
     startPeriodicSync();
