@@ -1,261 +1,131 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
-
-
 :root {
-
-    --sewa-orange: #ff6600;
-
-    --sewa-blue: #004d99;
-
+    --sewa-orange: #ff6600;
+    --sewa-blue: #004d99;
 }
-
-
 
 body {
-
-    /* Retain font, background, and color, which act as a global reset */
-
-    font-family: 'Roboto', sans-serif;
-
-    background-color: #f0f4f8;
-
-    color: #333;
-
+    /* Retain font, background, and color, which act as a global reset */
+    font-family: 'Roboto', sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
 }
-
-
 
 /* Visually hidden for accessibility (A utility-first framework may have an equivalent, but this is a standard A11y must-have) */
-
 .visually-hidden {
-
-    position: absolute;
-
-    width: 1px;
-
-    height: 1px;
-
-    margin: -1px;
-
-    padding: 0;
-
-    overflow: hidden;
-
-    clip: rect(0, 0, 0, 0);
-
-    border: 0;
-
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
 }
-
-
 
 /* Selected emoji-radio and number-scale styles (Complex structural/state logic kept) */
-
 .emoji-radio-group input:checked + label,
-
 .number-scale-group input:checked + label {
-
-    border-color: var(--sewa-orange);
-
-    background-color: #fff;
-
-    transform: scale(1.1);
-
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-
-    color: var(--sewa-orange);
-
+    border-color: var(--sewa-orange);
+    background-color: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    color: var(--sewa-orange);
 }
-
-
 
 /* Labels hover and transition styles (Kept to ensure smooth non-utility effects) */
-
 .emoji-radio-group label,
-
 .number-scale-group label,
-
 .location-radio-group label {
-
-    transition: all 0.2s ease-in-out;
-
-    cursor: pointer;
-
+    transition: all 0.2s ease-in-out;
+    cursor: pointer;
 }
-
-
 
 /* Star rating styles (Complex sibling/state selectors must be kept) */
-
 .star-rating input {
-
-    display: none;
-
+    display: none;
 }
-
 .star-rating input:checked ~ label,
-
 .star-rating input:checked ~ label:hover,
-
 .star-rating input:checked ~ label:hover ~ label {
-
-    color: #ffc107;
-
+    color: #ffc107;
 }
-
 .star-rating input:not(:checked) ~ label:hover,
-
 .star-rating input:not(:checked) ~ label:hover ~ label {
-
-    color: #ffc107;
-
+    color: #ffc107;
 }
-
-
 
 /* Location radio group selected style (Specific state-based styling kept) */
-
 .location-radio-group input:checked + label {
-
-    background-color: var(--sewa-orange);
-
-    color: white;
-
-    border-color: var(--sewa-orange);
-
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-
+    background-color: var(--sewa-orange);
+    color: white;
+    border-color: var(--sewa-orange);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
-
-
 
 /* Hidden fields - animate height with max-height (A technique not easily done with standard utility classes like 'hidden') */
-
 .hidden-fields {
-
-    opacity: 0;
-
-    max-height: 0;
-
-    overflow: hidden;
-
-    pointer-events: none;
-
-    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out; 
-
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out, max-height 0.3s ease-in-out; 
 }
-
 .visible-fields {
-
-    opacity: 1;
-
-    max-height: 1000px; /* set to a large enough value to animate open */
-
-    pointer-events: auto;
-
+    opacity: 1;
+    max-height: 1000px; /* set to a large enough value to animate open */
+    pointer-events: auto;
 }
-
-
 
 /* Error state style for inputs/containers - simplified and kept to apply border/shadow to *containers* */
-
 .has-error {
-
-    /* Retained to override base/utility styling on error */
-
-    border-color: #dc2626 !important; 
-
-    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
-
+    /* Retained to override base/utility styling on error */
+    border-color: #dc2626 !important; 
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
-
-
 
 /* Checkmark animation styles (Complex animation and structure must be kept) */
-
 .checkmark-container {
-
-    min-height: 300px; /* Kept specific sizing */
-
+    min-height: 300px; /* Kept specific sizing */
 }
-
 .checkmark-circle {
-
-    background-color: #22c55e;
-
-    animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
-
+    background-color: #22c55e;
+    animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
 }
-
 .checkmark-icon {
-
-    font-weight: bold;
-
+    font-weight: bold;
 }
-
-
 
 /* BounceIn keyframes for checkmark (Must be kept) */
-
 @keyframes bounceIn {
-
-    0% {
-
-        transform: scale(0);
-
-        opacity: 0;
-
-    }
-
-    60% {
-
-        transform: scale(1.1);
-
-        opacity: 1;
-
-    }
-
-    100% {
-
-        transform: scale(1);
-
-    }
-
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    60% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
 }
-
-
 
 /* Spinner styles for loading states (Must be kept) */
-
 .spinner {
-
-    border: 4px solid rgba(255, 255, 255, 0.3);
-
-    border-top-color: #fff;
-
-    animation: spin 1s ease-in-out infinite;
-
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
 }
-
 @keyframes spin {
-
-    to {
-
-        transform: rotate(360deg);
-
-    }
-
+    to {
+        transform: rotate(360deg);
+    }
 }
-
-
 
 /* Focus outline for accessibility (Critical A11y component kept) */
-
 input:focus, textarea:focus, button:focus, label:focus {
-
-    outline: 2px solid var(--sewa-orange);
-
-    outline-offset: 2px;
-
+    outline: 2px solid var(--sewa-orange);
+    outline-offset: 2px;
 }
