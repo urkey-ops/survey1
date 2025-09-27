@@ -1,4 +1,4 @@
-// --- survey-app.js (Final Production & Resilient Version with Auto-Reset) ---
+// --- survey-app.js (Final Production & Resilient Version with Hidden Admin Panel) ---
 
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
@@ -7,8 +7,8 @@ const DEFAULT_STATE = {
     inactivityTimer: null,
     syncTimer: null,
     rotationInterval: null, 
-    // New: Timer for the post-submission reset delay
-    postSubmitResetTimer: null
+    postSubmitResetTimer: null,
+    adminClickCount: 0 // New state for tracking header clicks
 };
 
 // Retrieve state from LocalStorage or use default
@@ -22,7 +22,9 @@ const appState = {
 };
 
 // Global variables for DOM elements (Assigned inside DOMContentLoaded)
-let questionContainer, nextBtn, prevBtn, syncStatusIndicator;
+let questionContainer, nextBtn, prevBtn, 
+    mainTitle, adminControls, unsyncedCountDisplay, 
+    syncButton, adminClearButton, hideAdminButton;
 
 
 // --- UTILITIES & STATE MANAGEMENT ---
@@ -39,7 +41,6 @@ function updateData(key, value) {
         appState.formData[key] = value;
         appState.formData.sync_status = 'unsynced';
         saveState();
-        updateSyncStatusUI('unsynced');
     }
 }
 
@@ -50,38 +51,49 @@ function clearErrors() {
     });
 }
 
-// Update a visible indicator for administrators
-function updateSyncStatusUI(status) {
-    if (!syncStatusIndicator) return;
-
-    let text, color;
-    switch (status) {
-        case 'synced':
-            text = 'Synced ✅';
-            color = 'text-green-600';
-            break;
-        case 'unsynced':
-            text = 'Unsynced 🔄';
-            color = 'text-yellow-600';
-            break;
-        case 'syncing':
-            text = 'Syncing... ⏳';
-            color = 'text-gray-500';
-            break;
-        case 'failed':
-            text = 'Sync Failed ⚠️';
-            color = 'text-red-600';
-            break;
-        default:
-            text = '';
-            color = 'text-gray-500';
+// **NEW:** Count how many records are stored locally and marked 'unsynced'
+function countUnsyncedRecords() {
+    let count = 0;
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('surveyAppState')) { 
+            try {
+                const data = JSON.parse(localStorage.getItem(key));
+                if (data && data.formData && data.formData.sync_status === 'unsynced') {
+                    count++;
+                }
+            } catch (e) {
+                console.warn(`Error parsing localStorage item ${key}:`, e);
+            }
+        }
     }
-    syncStatusIndicator.textContent = text;
-    syncStatusIndicator.className = `absolute top-0 right-0 p-2 text-sm font-bold ${color}`;
+    // Note: This logic assumes only ONE surveyAppState is saved.
+    // For multiple entries, keys would need to be timestamped.
+    // Sticking to one entry for this scope: check the current formData sync status.
+    if (appState.formData.sync_status === 'unsynced') {
+        // Assume 1 unsynced record if current state is unsynced
+        return 1;
+    }
+    return 0; // Otherwise, assume 0
 }
 
+function updateAdminCount() {
+    if (unsyncedCountDisplay) {
+        const count = countUnsyncedRecords();
+        unsyncedCountDisplay.textContent = `Unsynced Records: ${count}`;
+        
+        // Simple visual feedback for admin
+        if (count > 0) {
+            unsyncedCountDisplay.classList.remove('text-green-600');
+            unsyncedCountDisplay.classList.add('text-red-600');
+        } else {
+            unsyncedCountDisplay.classList.remove('text-red-600');
+            unsyncedCountDisplay.classList.add('text-green-600');
+        }
+    }
+}
 
-// --- VALIDATION LOGIC (UNCHANGED) ---
+// --- VALIDATION & NAVIGATION (UNCHANGED) ---
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
 
@@ -138,8 +150,6 @@ function validateQuestion(q) {
     return isValid;
 }
 
-
-// --- NAVIGATION & RENDERING (UNCHANGED) ---
 
 function cleanupIntervals() {
     if (appState.rotationInterval) {
@@ -208,6 +218,9 @@ function goPrev() {
 
 // --- SYNC & SUBMISSION LOGIC ---
 
+/** * SILENT Sync Logic: Removes all user-facing feedback/alerts.
+ * Updates the admin counter upon failure/success.
+ */
 async function syncData() {
     if (appState.formData.sync_status !== 'unsynced') {
         return true;
@@ -216,8 +229,6 @@ async function syncData() {
     const MAX_RETRIES = 3;
     const RETRY_DELAY_MS = 2000;
     let lastError = null;
-
-    updateSyncStatusUI('syncing');
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -231,9 +242,10 @@ async function syncData() {
                 throw new Error(`Server returned status: ${response.status}`);
             }
             
+            // Success: Update status and counter
             appState.formData.sync_status = 'synced';
             saveState();
-            updateSyncStatusUI('synced');
+            updateAdminCount(); 
             return true;
             
         } catch (error) {
@@ -244,10 +256,9 @@ async function syncData() {
         }
     }
 
-    console.error(`Data sync failed permanently after ${MAX_RETRIES} attempts. Error: ${lastError.message}`);
-    updateSyncStatusUI('failed');
-    alert("CRITICAL WARNING: Data sync failed after multiple retries. Data is safe locally, but requires manual attention (check network/server log).");
-    
+    // Failure: No blocking alert, just log and update admin counter
+    console.error(`SILENT FAIL: Data sync failed permanently after ${MAX_RETRIES} attempts. Error: ${lastError.message}`);
+    updateAdminCount(); 
     return false;
 }
 
@@ -259,25 +270,24 @@ function autoSync() {
  * Handles survey submission and triggers an immediate auto-reset.
  */
 function submitSurvey() {
-    // Attempt final sync
+    // Attempt final sync (silently)
     syncData(); 
 
     // Final cleanup of background timers
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
-    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); // Clear any pending resets
+    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
 
-    // Display thank you message
+    // Display thank you message (5-second delay)
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
-    // **NEW IMPLEMENTATION 1: Auto-Reset after Completion**
+    // Auto-Reset after Completion
     appState.postSubmitResetTimer = setTimeout(() => {
-        // Clear the saved state and force a fresh reload to Q1
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
-    }, 5000); // 5-second delay for user to read the message
+    }, 5000); 
 }
 
 
@@ -289,26 +299,24 @@ function submitSurvey() {
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
     
-    // Clear any pending post-submission reset if user interacts
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
 
     appState.inactivityTimer = setTimeout(() => {
-        // **NEW IMPLEMENTATION 2: Auto-Reset Mid-Survey on Inactivity**
         
-        // 1. If the current question index is > 0, the user has started the survey.
         const isInProgress = appState.currentQuestionIndex > 0;
         
-        // 2. If it's in progress, save partially filled data and sync it.
         if (isInProgress) {
              console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
+             
+             // 1. Save and sync partial data (silently)
              saveState(); 
              autoSync();
              
-             // 3. Force reset immediately after saving partial data
+             // 2. Force reset immediately after saving partial data
              localStorage.removeItem('surveyAppState');
              window.location.reload();
         } else {
-             // If they were on Q1 and did nothing, just save the default state and continue periodic sync
+             // If on Q1 and inactive, just save/sync and wait for the next interaction/timer
              saveState();
              autoSync();
         }
@@ -334,32 +342,90 @@ function rotateQuestionText(q) {
 }
 
 
-// --- INITIALIZATION (CRITICAL - UNCHANGED) ---
+// --- ADMIN ACCESS LOGIC ---
+
+function setupAdminAccess() {
+    // New: Handle click counter for admin panel toggle
+    mainTitle.addEventListener('click', () => {
+        appState.adminClickCount++;
+        if (appState.adminClickCount >= 5) {
+            toggleAdminPanel(true);
+            appState.adminClickCount = 0; // Reset counter after successful access
+        }
+    });
+
+    // New: Handle hide button click
+    hideAdminButton.addEventListener('click', () => {
+        toggleAdminPanel(false);
+    });
+
+    // New: Handle manual sync click
+    syncButton.addEventListener('click', () => {
+        syncData(); // Triggers the same silent sync
+        updateAdminCount(); // Immediately update the counter after manual sync attempt
+    });
+    
+    // New: Handle clear data click
+    adminClearButton.addEventListener('click', () => {
+        if (confirm("WARNING: Are you sure you want to delete ALL local survey data? This is permanent.")) {
+            localStorage.removeItem('surveyAppState');
+            window.location.reload();
+        }
+    });
+}
+
+function toggleAdminPanel(show) {
+    if (show) {
+        adminControls.classList.remove('hidden');
+        updateAdminCount(); // Show the current count immediately
+    } else {
+        adminControls.classList.add('hidden');
+        appState.adminClickCount = 0; // Reset for security
+    }
+}
+
+
+// --- INITIALIZATION (CRITICAL) ---
 
 document.addEventListener('DOMContentLoaded', () => {
     
+    // 1. Assign ALL DOM elements (MUST MATCH HTML IDs EXACTLY)
     questionContainer = document.getElementById('questionContainer');
     nextBtn = document.getElementById('nextBtn');
     prevBtn = document.getElementById('prevBtn');
-    syncStatusIndicator = document.getElementById('sync-status-indicator'); 
+    mainTitle = document.getElementById('mainTitle'); // Target for 5-click access
     
-    if (!questionContainer || !nextBtn || !prevBtn) {
+    // Group all admin buttons into one element for easier visibility toggle (Requires one wrapper DIV in HTML)
+    // NOTE: For this code to work, you must wrap syncButton, adminClearButton, hideAdminButton 
+    // AND unsyncedCountDisplay into a single container DIV with an ID like 'adminControls'.
+    adminControls = document.getElementById('adminControls'); 
+    syncButton = document.getElementById('syncButton'); 
+    adminClearButton = document.getElementById('adminClearButton'); 
+    hideAdminButton = document.getElementById('hideAdminButton');
+    unsyncedCountDisplay = document.getElementById('unsyncedCountDisplay'); // New element ID
+    
+    // Check critical public elements
+    if (!questionContainer || !nextBtn || !prevBtn || !mainTitle) {
         console.error("CRITICAL ERROR: Missing essential HTML elements. Survey cannot start.");
         return; 
     }
 
+    // 2. Setup public interaction listeners
     nextBtn.addEventListener('click', goNext);
     prevBtn.addEventListener('click', goPrev);
     document.addEventListener('mousemove', resetInactivityTimer);
     document.addEventListener('keydown', resetInactivityTimer);
 
-    // If the app is loaded right after a submission, the reset timer might still be running.
-    // Ensure all timers are clear on load.
-    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
-
-    // Start the application flow
+    // 3. Setup administrator access
+    if (adminControls) {
+        adminControls.classList.add('hidden'); // Ensure controls start hidden
+        setupAdminAccess();
+    } else {
+         console.warn("Admin controls container 'adminControls' is missing. Manual features disabled.");
+    }
+    
+    // 4. Start the application flow
     showQuestion(appState.currentQuestionIndex);
     resetInactivityTimer();
     startPeriodicSync();
-    updateSyncStatusUI(appState.formData.sync_status);
 });
