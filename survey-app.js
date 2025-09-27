@@ -1,4 +1,4 @@
-// --- survey-app.js (VERSION 6: Q1 Button Visibility Fix) ---
+// --- survey-app.js (VERSION 7: Always Enabled Button Fix) ---
 
 // --- CONFIGURATION CONSTANTS ---
 const MAX_RETRIES = 3;
@@ -8,7 +8,7 @@ const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const RESET_DELAY_MS = 5000; // 5 seconds post-submission
 
 // --- UTILITIES & STATE MANAGEMENT ---
-// Function to generate a simple UUID (UPDATED with crypto API fallback)
+// Function to generate a simple UUID
 function generateUUID() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -35,34 +35,10 @@ function safeGetLocalStorage(key) {
 }
 
 /**
- * Safely retrieves the submission queue. (NEW UTILITY)
+ * Safely retrieves the submission queue.
  */
 function getSubmissionQueue() {
     return safeGetLocalStorage('submissionQueue') || [];
-}
-
-/**
- * NEW: Attaches an 'input' listener to a text field to immediately enable the Next button.
- * This forces the button to adopt its correct orange/white styling, bypassing CSS conflicts.
- * The button is ENABLED by default, so this just ensures a visual refresh.
- */
-function refreshNextButtonOnInput(inputId) {
-    const inputField = document.getElementById(inputId);
-    const nextBtn = document.getElementById('nextBtn');
-    
-    if (!inputField || !nextBtn) return;
-
-    // The handler function simply ensures the button's state is explicitly 'enabled'.
-    const enableButtonHandler = () => {
-        nextBtn.disabled = false;
-        // Optionally, check length > 0, but for this visual fix, just the 'input' event is enough.
-    };
-
-    // Attach listener to run the check every time the input changes
-    inputField.addEventListener('input', enableButtonHandler);
-    
-    // Run once immediately in case the user reloads with saved text
-    enableButtonHandler();
 }
 // ---------------------------------------------------------------------
 
@@ -214,16 +190,6 @@ function showQuestion(index) {
 
         questionContainer.innerHTML = renderer.render(q, appState.formData);
         
-        // --- ADDED FIX LOGIC FOR Q1 INTERACTIVITY ---
-        if (index === 0 && q.type === 'text') { 
-            // Delay slightly to ensure the HTML element has rendered, then attach listener
-            setTimeout(() => { 
-                refreshNextButtonOnInput(q.name); // Assuming input ID is q.name
-            }, 50); 
-        }
-        // --- END ADDED FIX LOGIC ---
-
-
         if (renderer.setupEvents) {
             renderer.setupEvents(q, { 
                 handleNextQuestion: goNext, 
@@ -237,7 +203,7 @@ function showQuestion(index) {
         
         prevBtn.disabled = index === 0;
         nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-        nextBtn.disabled = false; // Always enabled here
+        nextBtn.disabled = false; // Always ensured to be false here
         
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
@@ -363,8 +329,10 @@ function submitSurvey() {
 
     // 1. Show thank you message immediately
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
-    nextBtn.disabled = true;
-    prevBtn.disabled = true;
+    
+    // --- FIX: Button remains ENABLED to preserve correct CSS styling ---
+    // nextBtn.disabled = true; // REMOVED
+    prevBtn.disabled = true; 
     
     // 2. Schedule the fast, reliable reset
     appState.postSubmitResetTimer = setTimeout(() => {
