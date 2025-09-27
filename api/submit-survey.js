@@ -1,5 +1,3 @@
-// api/submit-survey.js
-
 import { google } from 'googleapis';
 
 // --- Define Column Order (Must match your Google Sheet headers) ---
@@ -20,31 +18,38 @@ const COLUMN_ORDER = [
 
 // Function to clean and map a single submission object to the required array format
 function processSingleSubmission(submission) {
-    // Safely extract and clean data from the client payload
-    const data = submission.data || {};
+    // *** FIX START ***
+    // The client sends data fields directly on the 'submission' object, not nested under 'submission.data'.
+    const source = submission;
+    // *** FIX END ***
+    
     const processedData = {
         // Core tracking fields
-        id: submission.id || 'N/A',
-        timestamp: submission.timestamp || new Date().toISOString(),
-        is_incomplete: submission.is_incomplete ? 'Yes' : 'No',
+        // Now using 'source' (which is the submission object) instead of 'submission.data'
+        id: source.id || 'N/A', 
+        timestamp: source.timestamp || new Date().toISOString(),
         
-        // Survey fields
-        comments: (data.comments || '').trim(),
-        satisfaction: data.satisfaction || '',
-        cleanliness: data.cleanliness || '',
-        staff_friendliness: data.staff_friendliness || '',
+        // is_incomplete check is derived from client-side state
+        // (Note: client-side formData doesn't explicitly have this, but using source maintains original logic flow)
+        is_incomplete: source.is_incomplete ? 'Yes' : 'No', 
         
-        // Handle Location (radio-with-other) logic
-        location: (data.location === 'Other' && data.other_location)
-            ? data.other_location.trim()
-            : (data.location || ''),
+        // Survey fields - Data is now correctly pulled directly from 'source'
+        comments: (source.comments || '').trim(),
+        satisfaction: source.satisfaction || '',
+        cleanliness: source.cleanliness || '',
+        staff_friendliness: source.staff_friendliness || '',
+        
+        // Handle Location (radio-with-other) logic - Now using 'source'
+        location: (source.location === 'Other' && source.other_location)
+            ? source.other_location.trim()
+            : (source.location || ''),
             
-        age: data.age || '',
+        age: source.age || '',
         
-        // Contact fields
-        name: (data.name || '').trim(),
-        email: (data.email || '').trim(),
-        newsletterConsent: data.newsletterConsent || '',
+        // Contact fields - Now using 'source'
+        name: (source.name || '').trim(),
+        email: (source.email || '').trim(),
+        newsletterConsent: source.newsletterConsent || '',
     };
     
     // Map the processed data object to an array based on the defined column order
