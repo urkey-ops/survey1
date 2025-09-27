@@ -144,3 +144,9 @@ button:disabled {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+#nextBtn {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
