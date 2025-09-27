@@ -1,4 +1,4 @@
-// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin) ---
+// --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED) ---
 
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
@@ -223,12 +223,20 @@ async function syncData(showAdminFeedback = false) {
         syncStatusMessage.textContent = 'Syncing... ⏳';
     }
 
+    // *** FIX START: Create the payload structure the server expects ***
+    // The server expects an object with a 'submissions' property which is an array.
+    const payload = {
+        submissions: [appState.formData] 
+    };
+    // *** FIX END ***
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const response = await fetch('/api/survey-sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(appState.formData)
+                // Use the correctly formatted payload
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) {
@@ -302,16 +310,16 @@ function resetInactivityTimer() {
         const isInProgress = appState.currentQuestionIndex > 0;
         
         if (isInProgress) {
-             console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
-             
-             saveState(); 
-             autoSync();
-             
-             localStorage.removeItem('surveyAppState');
-             window.location.reload();
+              console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
+              
+              saveState(); 
+              autoSync();
+              
+              localStorage.removeItem('surveyAppState');
+              window.location.reload();
         } else {
-             saveState();
-             autoSync();
+              saveState();
+              autoSync();
         }
     }, 300000); // 5 minutes
 }
@@ -420,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
         adminControls.classList.add('hidden'); 
         setupAdminAccess();
     } else {
-         console.warn("Admin controls container 'adminControls' is missing. Manual features disabled.");
+          console.warn("Admin controls container 'adminControls' is missing. Manual features disabled.");
     }
     
     // 4. Start the application flow
