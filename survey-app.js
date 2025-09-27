@@ -3,10 +3,11 @@
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
+    // Add timestamp for unique ID/ordering and sync_status for offline-first tracking
     formData: { timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
     inactivityTimer: null,
     syncTimer: null,
-    rotationInterval: null, // Timer reference for rotation
+    rotationInterval: null, // Timer reference for rotation cleanup
 };
 
 // Retrieve state from LocalStorage or use default
@@ -75,8 +76,10 @@ function updateSyncStatusUI(status) {
             color = 'text-gray-500';
     }
     syncStatusIndicator.textContent = text;
+    // Note: Tailwind classes are assumed to exist in your environment
     syncStatusIndicator.className = `absolute top-0 right-0 p-2 text-sm font-bold ${color}`;
 }
+
 
 // --- VALIDATION LOGIC ---
 
@@ -88,7 +91,7 @@ function validateQuestion(q) {
     let isValid = true;
     let errorMessage = '';
 
-    // Helper to display error safely (Robustness fix against missing IDs)
+    // Helper to display error safely
     const displayError = (id, message) => {
         const errorEl = document.getElementById(id);
         if (errorEl) {
@@ -142,9 +145,8 @@ function validateQuestion(q) {
 
 // --- NAVIGATION & RENDERING ---
 
-/** Ensures no intervals are running before rendering new content. */
+/** Ensures no rotation intervals are running, preventing memory leaks. */
 function cleanupIntervals() {
-    // 3. Clear rotation interval explicitly and set reference to null (Fix for leaks)
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
         appState.rotationInterval = null;
@@ -175,7 +177,6 @@ function showQuestion(index) {
         nextBtn.disabled = false;
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
-        // Display a generic error to the user if rendering fails
         questionContainer.innerHTML = '<h2 class="text-xl font-bold text-red-600">A critical error occurred. Please refresh.</h2>';
     }
 }
@@ -213,6 +214,9 @@ function goPrev() {
 
 // --- SYNC & SUBMISSION LOGIC ---
 
+/** * Handles API sync with retry mechanism (Vercel Function + Google Sheets API).
+ * Attempts to sync data up to MAX_RETRIES times for kiosk resilience.
+ */
 async function syncData() {
     if (appState.formData.sync_status !== 'unsynced') {
         return true;
@@ -226,6 +230,7 @@ async function syncData() {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
+            // API Call to your Vercel Function endpoint
             const response = await fetch('/api/survey-sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -249,11 +254,11 @@ async function syncData() {
         }
     }
 
-    // Final Failure Handling (Points 5 & 6)
+    // Final Failure Handling
     console.error(`Data sync failed permanently after ${MAX_RETRIES} attempts. Error: ${lastError.message}`);
     updateSyncStatusUI('failed');
     
-    // Notify the admin/user that data is stuck offline
+    // Notify the admin/user (critical for kiosk operation)
     alert("CRITICAL WARNING: Data sync failed after multiple retries. Data is safe locally, but requires manual attention (check network/server log).");
     
     return false;
@@ -266,7 +271,7 @@ function autoSync() {
 function submitSurvey() {
     syncData(); 
 
-    // Final cleanup of timers
+    // Final cleanup of all timers
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
 
@@ -274,7 +279,7 @@ function submitSurvey() {
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
-    // **4. Clean Start Option:** Uncomment this line for a fresh start for the next user.
+    // OPTIONAL: Uncomment to reset the kiosk for the next user immediately.
     // localStorage.removeItem('surveyAppState'); 
 }
 
@@ -308,15 +313,15 @@ function rotateQuestionText(q) {
 }
 
 
-// --- INITIALIZATION (DOM Ready) ---
+// --- INITIALIZATION FIX (CRITICAL) ---
 
+// Wait for the entire HTML document to be loaded before accessing elements.
 document.addEventListener('DOMContentLoaded', () => {
     
-    // 1. Assign DOM elements
-    questionContainer = document.getElementById('question-container');
-    nextBtn = document.getElementById('next-btn');
-    prevBtn = document.getElementById('prev-btn');
-    // **2. New Element:** Assign the sync indicator
+    // 1. Assign DOM elements (must match HTML IDs exactly: questionContainer, nextBtn, prevBtn)
+    questionContainer = document.getElementById('questionContainer');
+    nextBtn = document.getElementById('nextBtn');
+    prevBtn = document.getElementById('prevBtn');
     syncStatusIndicator = document.getElementById('sync-status-indicator'); 
     
     if (!questionContainer || !nextBtn || !prevBtn) {
@@ -324,13 +329,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return; 
     }
 
-    // Event listeners 
+    // 2. Event listeners 
     nextBtn.addEventListener('click', goNext);
     prevBtn.addEventListener('click', goPrev);
     document.addEventListener('mousemove', resetInactivityTimer);
     document.addEventListener('keydown', resetInactivityTimer);
 
-    // Start the application flow
+    // 3. Start the application flow
     showQuestion(appState.currentQuestionIndex);
     resetInactivityTimer();
     startPeriodicSync();
