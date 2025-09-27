@@ -230,3 +230,5 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start a periodic sync check (15 minutes)
     appState.syncIntervalId = setInterval(syncData, 900000); // Imported syncData
 });
+
+//
