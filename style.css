@@ -1,4 +1,4 @@
-/* --- kiosk-survey.css (Updated for Disabled Button Visibility) --- */
+/* --- kiosk-survey.css (Updated for Disabled Button Visual Styling) --- */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
@@ -36,14 +36,19 @@ input:focus, textarea:focus, button:focus, label:focus-within {
 }
 
 /* --- FIX: Ensure Disabled Button is Readable --- */
-/* This overrides potentially conflicting browser/Tailwind defaults for the :disabled state. */
 button:disabled {
     background-color: var(--disabled-bg) !important;
     color: var(--disabled-text) !important;
     cursor: not-allowed !important;
     box-shadow: none !important;
     opacity: 1 !important;
-    /* This fix ensures white text on the button (like Next/Submit) turns dark when disabled. */
+}
+
+/* --- Custom Visual Disabled State for Buttons (Without actual disabling) --- */
+.button-disabled-style {
+    cursor: not-allowed;
+    opacity: 0.6;
+    pointer-events: none; /* Prevents interaction */
 }
 
 /* --- Custom Field Styling and Selection --- */
