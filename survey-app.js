@@ -1,19 +1,53 @@
-// --- survey-app.js (VERSION 4: Offline Queue & Fast Reset) ---
+// --- survey-app.js (VERSION 5: Robust Kiosk Final) ---
+
+// --- CONFIGURATION CONSTANTS (NEW) ---
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 2000;
+const INACTIVITY_TIMEOUT_MS = 300000; // 5 minutes
+const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+const RESET_DELAY_MS = 5000; // 5 seconds post-submission
 
 // --- UTILITIES & STATE MANAGEMENT ---
-// Function to generate a simple UUID (NEW UTILITY)
+// Function to generate a simple UUID (UPDATED with crypto API fallback)
 function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
     });
 }
+
+/**
+ * Safely retrieves and parses a JSON item from localStorage.
+ * @param {string} key - The localStorage key.
+ * @returns {any | null} The parsed data or null if invalid/missing.
+ */
+function safeGetLocalStorage(key) {
+    const item = localStorage.getItem(key);
+    if (!item) return null;
+    try {
+        return JSON.parse(item);
+    } catch (e) {
+        console.warn(`Failed to parse saved state for key '${key}':`, e);
+        return null; // Treat corrupted data as missing data
+    }
+}
+
+/**
+ * Safely retrieves the submission queue. (NEW UTILITY)
+ * @returns {Array<Object>} The submission queue array, or an empty array if invalid/missing.
+ */
+function getSubmissionQueue() {
+    return safeGetLocalStorage('submissionQueue') || [];
+}
 // ---------------------------------------------------------------------
 
-// 1. GLOBAL STATE DEFINITION (UPDATED: Removed sync_status from appState)
+// 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    // ID is generated here. The 'sync_status' will now live only on the queue records.
     formData: { id: generateUUID(), timestamp: new Date().toISOString() }, 
     inactivityTimer: null,
     syncTimer: null,
@@ -22,13 +56,14 @@ const DEFAULT_STATE = {
     adminClickCount: 0 
 };
 
-// Retrieve IN-PROGRESS state from LocalStorage or use default
-const savedState = JSON.parse(localStorage.getItem('surveyAppState'));
+// Retrieve IN-PROGRESS state safely (UPDATED to use safeGetLocalStorage)
+const savedState = safeGetLocalStorage('surveyAppState');
 const appState = { 
     ...DEFAULT_STATE, 
     ...(savedState ? { 
-        currentQuestionIndex: savedState.currentQuestionIndex, 
-        formData: savedState.formData 
+        // We only persist the index and form data for in-progress surveys
+        currentQuestionIndex: savedState.currentQuestionIndex || 0, 
+        formData: savedState.formData || DEFAULT_STATE.formData 
     } : {})
 };
 
@@ -54,7 +89,6 @@ function saveState() {
 function updateData(key, value) {
     if (appState.formData[key] !== value) {
         appState.formData[key] = value;
-        // NOTE: No sync_status update here, as that is only tracked on the final queued item.
         saveState();
     }
 }
@@ -66,11 +100,9 @@ function clearErrors() {
     });
 }
 
-// --- NEW/REVISED: Admin Counter now checks the submission queue ---
 function countUnsyncedRecords() {
-    // REVISED 2: Count the records in the submission queue
-    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
-    return submissionQueue.length;
+    // Uses the new safe getter
+    return getSubmissionQueue().length;
 }
 
 function updateAdminCount() {
@@ -89,7 +121,7 @@ function updateAdminCount() {
 }
 
 // ---------------------------------------------------------------------
-// --- VALIDATION & NAVIGATION (Unchanged from previous version) ---
+// --- VALIDATION & NAVIGATION (Logic Unchanged) ---
 // ---------------------------------------------------------------------
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
@@ -214,15 +246,13 @@ function goPrev() {
 
 
 // ---------------------------------------------------------------------
-// --- SYNC & SUBMISSION LOGIC (HEAVILY REVISED) ---
+// --- SYNC & SUBMISSION LOGIC ---
 // ---------------------------------------------------------------------
 
-/** * Silent Sync Logic: Performs API call with retries and processes the entire queue. 
- * showAdminFeedback flag determines if status messages are displayed in the Admin Panel.
+/** * Processes the submission queue. Clears the queue only upon successful server sync.
  */
 async function syncData(showAdminFeedback = false) {
-    // REVISED 2: Read the entire queue
-    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+    const submissionQueue = getSubmissionQueue(); // Uses the safe getter
 
     if (submissionQueue.length === 0) {
         if (showAdminFeedback && syncStatusMessage) {
@@ -232,15 +262,13 @@ async function syncData(showAdminFeedback = false) {
         return true;
     }
 
-    const MAX_RETRIES = 3;
-    const RETRY_DELAY_MS = 2000;
     let lastError = null;
 
     if (showAdminFeedback && syncStatusMessage) {
         syncStatusMessage.textContent = `Syncing ${submissionQueue.length} records... ⏳`;
     }
 
-    // REVISED 2: The payload is the entire queue array.
+    // The payload is the entire queue array, ready for the Vercel function.
     const payload = {
         submissions: submissionQueue 
     };
@@ -254,11 +282,10 @@ async function syncData(showAdminFeedback = false) {
             });
 
             if (!response.ok) {
-                // Important: Throw the error to trigger the retry loop
                 throw new Error(`Server returned status: ${response.status}`);
             }
             
-            // SUCCESS: The server has the data, so we can now safely clear the local queue.
+            // SUCCESS: Clear the local queue and update admin panel
             localStorage.removeItem('submissionQueue');
             updateAdminCount(); 
             
@@ -276,33 +303,29 @@ async function syncData(showAdminFeedback = false) {
         }
     }
 
-    // Failure: Log to console and update admin counter
+    // Failure: Log and update admin counter (data remains in queue)
     console.error(`PERMANENT FAIL: Data sync failed. Error: ${lastError.message}`);
-    updateAdminCount(); // This still ensures the admin panel shows the failure count
+    updateAdminCount(); 
     
     if (showAdminFeedback && syncStatusMessage) {
         syncStatusMessage.textContent = 'Manual Sync Failed ⚠️ (Check Console)';
-        // Keep the failure message visible until the admin hides the panel or clicks again
     }
     return false;
 }
 
 function autoSync() {
-    // Runs in the background, non-blocking.
     syncData(false);
 }
 
 function submitSurvey() {
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
-    // Note: Do NOT stop appState.syncTimer here, let the periodic sync keep running.
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
 
-    // --- NEW LOGIC: Queue the Completed Survey (Step 1) ---
-    const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+    // --- Step 1: Queue the Completed Survey ---
+    const submissionQueue = getSubmissionQueue(); // Uses the safe getter
     
-    // CRITICAL: Ensure the current timestamp is final before queuing.
+    // Finalize data before queuing.
     appState.formData.timestamp = new Date().toISOString();
-    // Add a status flag to the queued item for future debugging, if needed.
     appState.formData.sync_status = 'unsynced';
     
     submissionQueue.push(appState.formData);
@@ -315,10 +338,13 @@ function submitSurvey() {
     
     // 2. Schedule the fast, reliable reset
     appState.postSubmitResetTimer = setTimeout(() => {
-        // IMPORTANT: Clear only the IN-PROGRESS state, leaving the queue intact.
+        // CRITICAL FIX: Ensure the in-progress state is set to Question 1 (Index 0)
+        appState.currentQuestionIndex = 0; 
+        
+        // Clear only the IN-PROGRESS state, leaving the queue intact.
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
-    }, 5000); 
+    }, RESET_DELAY_MS); 
 }
 
 
@@ -328,7 +354,6 @@ function submitSurvey() {
 
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
-    
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
 
     appState.inactivityTimer = setTimeout(() => {
@@ -338,30 +363,32 @@ function resetInactivityTimer() {
         if (isInProgress) {
              console.log('Mid-survey inactivity detected. Auto-saving and resetting kiosk.');
              
-             // --- NEW LOGIC: Queue the Abandoned Survey (Step 1) ---
-             const submissionQueue = JSON.parse(localStorage.getItem('submissionQueue')) || [];
+             // --- Step 1: Queue the Abandoned Survey ---
+             const submissionQueue = getSubmissionQueue(); // Uses the safe getter
              
-             // CRITICAL: Finalize data before reset, ID is already present from initial state.
+             // Finalize data before reset.
              appState.formData.timestamp = new Date().toISOString();
              appState.formData.sync_status = 'unsynced (inactivity)';
              
              submissionQueue.push(appState.formData);
              localStorage.setItem('submissionQueue', JSON.stringify(submissionQueue));
 
-             // --- Step 3: Fast Reset (autoSync is removed from here) ---
+             // --- Step 3: Fast Reset (autoSync call removed) ---
+             // CRITICAL FIX: Ensure the in-progress state is set to Question 1 (Index 0)
+             appState.currentQuestionIndex = 0; 
+
              localStorage.removeItem('surveyAppState');
              window.location.reload();
         } else {
-             // Only save/sync if not in progress (i.e., on the landing screen)
-             // On landing screen, we just rely on the periodic sync.
+             // On landing screen, rely on the periodic sync only.
              autoSync();
         }
-    }, 300000); // 5 minutes
+    }, INACTIVITY_TIMEOUT_MS);
 }
 
 function startPeriodicSync() {
     if (appState.syncTimer) clearInterval(appState.syncTimer);
-    appState.syncTimer = setInterval(autoSync, 15 * 60 * 1000); // 15 minutes
+    appState.syncTimer = setInterval(autoSync, SYNC_INTERVAL_MS);
 }
 
 function rotateQuestionText(q) {
@@ -379,7 +406,7 @@ function rotateQuestionText(q) {
 
 
 // ---------------------------------------------------------------------
-// --- ADMIN ACCESS LOGIC (Updated for Visibility and Feedback) ---
+// --- ADMIN ACCESS LOGIC ---
 // ---------------------------------------------------------------------
 
 function setupAdminAccess() {
@@ -399,16 +426,14 @@ function setupAdminAccess() {
 
     // Manual Sync Button
     syncButton.addEventListener('click', () => {
-        // Manual sync provides immediate feedback to the admin (true)
         syncData(true); 
     });
     
-    // Clear Local Data Button (REVISED: Now clears the queue too)
+    // Clear Local Data Button (Clears In-Progress and the Queue)
     adminClearButton.addEventListener('click', () => {
         if (confirm("WARNING: Are you sure you want to delete ALL local survey data (Queue AND In-Progress)? This is permanent.")) {
-            // Clear the IN-PROGRESS state and the SUBMISSION QUEUE
             localStorage.removeItem('surveyAppState');
-            localStorage.removeItem('submissionQueue'); // NEW LINE
+            localStorage.removeItem('submissionQueue'); 
             window.location.reload();
         }
     });
@@ -418,7 +443,6 @@ function toggleAdminPanel(show) {
     if (show) {
         adminControls.classList.remove('hidden');
         updateAdminCount(); 
-        // Ensure the status message is clear on opening
         if (syncStatusMessage) syncStatusMessage.textContent = ''; 
     } else {
         adminControls.classList.add('hidden');
