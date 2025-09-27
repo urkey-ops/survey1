@@ -1,274 +1,251 @@
-// --- data-util.js (Final Version) ---
-window.dataUtils = (function() {
+// --- data-util.js ---
 
-    // Configuration data structure
-    const surveyQuestions = [
-        {
-            id: 'comments',
-            name: 'comments',
-            type: 'textarea',
-            question: '1. What did you like about your visit today?',
-            placeholder: 'Type your comments here...',
-            required: true,
-            rotatingText: [
-                "1. What did you like about your visit today?",
-                "1. What could we do better during your next visit?",
-                "1. Do you have any general comments or suggestions?",
-                "1. What was the most memorable part of your experience?"
-            ]
-        },
-        {
-            id: 'satisfaction',
-            name: 'satisfaction',
-            type: 'emoji-radio',
-            question: '2. Overall, how satisfied were you with your visit today?',
-            options: [
-                { value: 'Sad', label: 'Sad', emoji: '😞' },
-                { value: 'Neutral', label: 'Neutral', emoji: '😐' },
-                { value: 'Happy', label: 'Happy', emoji: '😊' }
-            ],
-            required: true
-        },
-        {
-            id: 'cleanliness',
-            name: 'cleanliness',
-            type: 'number-scale',
-            question: '3. How would you rate the cleanliness of the facility?',
-            min: 1,
-            max: 5,
-            labels: { min: '1 (Poor)', max: '5 (Excellent)' },
-            required: true
-        },
-        {
-            id: 'staff_friendliness',
-            name: 'staff_friendliness',
-            type: 'star-rating',
-            question: '4. How friendly was the volunteer staff?',
-            min: 1,
-            max: 5,
-            required: true
-        },
-        {
-            id: 'location',
-            name: 'location',
-            type: 'radio-with-other',
-            question: 'Where are you visiting from today?',
-            options: [
-                { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
-                { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
-                { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside GA)' },
-                { value: 'United States (outside GA)', label: 'United States (outside GA)' },
-                { value: 'Canada', label: 'Canada' },
-                { value: 'India', label: 'India' },
-                { value: 'Other', label: 'Other' }
-            ],
-            required: true
-        },
-        {
-            id: 'age',
-            name: 'age',
-            type: 'radio',
-            question: 'Which age group do you belong to?',
-            options: [
-                { value: 'Under 18', label: 'Under 18' },
-                { value: '18-40', label: '18-40' },
-                { value: '40-65', label: '40-65' },
-                { value: '65+', label: '65+' },
-            ],
-            required: true
-        },
-        {
-            id: 'contact',
-            name: 'contact',
-            type: 'custom-contact',
-            question: 'Help us stay in touch.',
-            required: false 
-        }
-    ];
+// 1. QUESTION DATA STRUCTURE
+const surveyQuestions = [
+    {
+        id: 'q1',
+        name: 'location',
+        type: 'radio-with-other',
+        title: 'Where did you hear about us?',
+        required: true,
+        options: [
+            { label: 'Social Media', value: 'Social Media' },
+            { label: 'Retail Location', value: 'Retail Location' },
+            { label: 'Friend/Family', value: 'Friend/Family' },
+            { label: 'Other', value: 'Other' } // Special value for custom input
+        ]
+    },
+    {
+        id: 'q2',
+        name: 'satisfaction',
+        type: 'rating-scale',
+        title: 'How satisfied were you with your visit today?',
+        required: true,
+        scale: 5, // 1 (Very Dissatisfied) to 5 (Very Satisfied)
+        labels: ['Very Dissatisfied', 'Very Satisfied']
+    },
+    {
+        id: 'q3',
+        name: 'serviceSpeed',
+        type: 'rating-scale',
+        title: 'How would you rate the speed of service?',
+        required: true,
+        scale: 4, // 1 (Too Slow) to 4 (Very Fast)
+        labels: ['Too Slow', 'Very Fast']
+    },
+    {
+        id: 'q4',
+        name: 'additionalComments',
+        type: 'textarea',
+        title: 'Do you have any additional comments or suggestions?',
+        required: false
+    },
+    {
+        id: 'q5',
+        name: 'contactInfo',
+        type: 'custom-contact',
+        title: 'Stay in Touch',
+        rotatingText: ['Tell us what you think!', 'Join our newsletter!', 'Get exclusive offers!'],
+        required: false // Fields inside are only required if consent is given
+    }
+];
 
-    const questionRenderers = {
 
-        'textarea': {
-            render: (q, data) => `
-                <label id="rotatingQuestion" for="${q.id}" class="block text-gray-700 font-semibold mb-2" aria-live="polite">${q.question}</label>
-                <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" ${q.required ? 'required' : ''}>${data[q.name] || ''}</textarea>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden"></span>`,
-            setupEvents: (q, { updateData }) => {
-                document.getElementById(q.id).addEventListener('input', (e) => {
-                    updateData(q.name, e.target.value);
-                });
-            }
-        },
+// 2. RENDERER LOGIC FOR EACH QUESTION TYPE
 
-        'emoji-radio': {
-            render: (q, data) => `
-                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="emoji-radio-group flex justify-around items-center space-x-4" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                            <span class="text-4xl sm:text-5xl mb-2">${opt.emoji}</span>
-                            <span class="text-sm font-medium text-gray-600">${opt.label}</span>
-                        </label>
-                    `).join('')}
-                </div>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
-            setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        updateData(q.name, e.target.value);
-                        setTimeout(() => handleNextQuestion(), 50);
-                    });
-                });
-            }
-        },
-
-        'number-scale': {
-            render: (q, data) => `
-                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="number-scale-group grid grid-cols-5 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${Array.from({ length: q.max }, (_, i) => i + 1).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-white border-2 border-transparent rounded-full font-bold text-gray-700 hover:bg-gray-50"><span>${num}</span></label>
-                    `).join('')}
-                </div>
-                <div class="flex justify-between text-sm mt-2 text-gray-500"><span>${q.labels.min}</span><span>${q.labels.max}</span></div>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
-            setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        updateData(q.name, e.target.value);
-                        setTimeout(() => handleNextQuestion(), 50);
-                    });
-                });
-            }
-        },
-
-        'star-rating': {
-            render: (q, data) => `
-                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
-                    `).join('')}
-                </div>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
-            setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        updateData(q.name, e.target.value);
-                        setTimeout(() => handleNextQuestion(), 50);
-                    });
-                });
-            }
-        },
-
-        'radio-with-other': {
-            render: (q, data) => `
-                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="location-radio-group grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
-                    `).join('')}
-                </div>
-                <div id="other-location-container" class="mt-4 ${data[q.name] === 'Other' ? '' : 'hidden'}">
-                    <input type="text" id="other_location_text" name="other_location" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Please specify" value="${data['other_location'] || ''}">
-                    <span id="other_location_textError" class="error-message text-red-500 text-sm hidden mt-1"></span>
-                </div>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
-            setupEvents: (q, { handleNextQuestion, updateData }) => {
-                const otherInput = document.getElementById('other_location_text');
-
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        const otherContainer = document.getElementById('other-location-container');
-                        updateData(q.name, e.target.value);
-                        
-                        if (e.target.value === 'Other') {
-                            otherContainer.classList.remove('hidden');
-                            // Ensure 'other' input changes are tracked
-                            otherInput.oninput = (event) => updateData('other_location', event.target.value);
-                        } else {
-                            otherContainer.classList.add('hidden');
-                            updateData('other_location', ''); // Clear and reset 'other' data
-                            setTimeout(() => handleNextQuestion(), 50);
-                        }
-                    });
-                });
-            }
-        },
-
-        'radio': {
-            render: (q, data) => `
-                <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
-                    ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
-                    `).join('')}
-                </div>
-                <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
-            setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        updateData(q.name, e.target.value);
-                        setTimeout(() => handleNextQuestion(), 50);
-                    });
-                });
-            }
-        },
-
-        'custom-contact': {
-            render: (q, data) => {
-                const isChecked = data['newsletterConsent'] === 'Yes';
+const questionRenderers = {
+    
+    // --- RATING SCALE RENDERER (q2, q3) ---
+    'rating-scale': {
+        render: (q, formData) => {
+            const currentValue = formData[q.name] || 0;
+            const optionsHtml = Array.from({ length: q.scale }, (_, i) => {
+                const value = i + 1;
+                const isChecked = currentValue == value;
                 return `
-                <div class="space-y-4">
-                    <div>
-                        <label for="name" class="block text-gray-700 font-semibold mb-2">Name</label>
-                        <input type="text" id="name" name="name" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your name" value="${data['name'] || ''}">
-                        <span id="nameError" class="error-message text-red-500 text-sm hidden"></span>
+                    <div class="flex flex-col items-center">
+                        <input type="radio" id="${q.name}_${value}" name="${q.name}" value="${value}" ${isChecked ? 'checked' : ''} class="hidden rating-input">
+                        <label for="${q.name}_${value}" class="w-12 h-12 flex items-center justify-center border-2 border-gray-300 rounded-full text-lg font-bold cursor-pointer transition-colors duration-200 
+                            ${isChecked ? 'bg-sewa-orange text-white border-sewa-orange shadow-md' : 'bg-white text-gray-700 hover:bg-gray-100'}"
+                        >
+                            ${value}
+                        </label>
                     </div>
+                `;
+            }).join('');
+
+            return `
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">${q.title}</h2>
+                <div class="flex justify-between items-center my-4">
+                    <span class="text-sm text-gray-500">${q.labels[0]}</span>
+                    <span class="text-sm text-gray-500">${q.labels[1]}</span>
+                </div>
+                <div id="${q.id}" class="flex justify-between items-center space-x-2">
+                    ${optionsHtml}
+                </div>
+                <div id="${q.id}Error" class="error-message text-red-500 text-sm mt-2 hidden"></div>
+            `;
+        },
+        setupEvents: (q, handlers) => {
+            document.querySelectorAll(`input[name="${q.name}"]`).forEach(input => {
+                input.addEventListener('change', (e) => {
+                    handlers.updateData(q.name, e.target.value);
+                    // Optional: Auto-advance after selection
+                    // handlers.handleNextQuestion();
+                });
+            });
+        }
+    },
+
+    // --- RADIO WITH 'OTHER' TEXT INPUT RENDERER (q1) ---
+    'radio-with-other': {
+        render: (q, formData) => {
+            const currentValue = formData[q.name] || '';
+            const otherValue = formData['other_location'] || '';
+            const isOtherChecked = currentValue === 'Other';
+            
+            const optionsHtml = q.options.map(option => {
+                const isChecked = currentValue === option.value;
+                return `
                     <div class="flex items-center">
-                        <input type="checkbox" id="newsletterConsent" name="newsletterConsent" value="Yes" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500" ${isChecked ? 'checked' : ''}>
-                        <label for="newsletterConsent" class="ml-2 block text-gray-700">Yes, I want to subscribe to updates</label>
+                        <input id="${q.name}_${option.value}" name="${q.name}" type="radio" value="${option.value}" ${isChecked ? 'checked' : ''} class="w-4 h-4 text-sewa-orange focus:ring-sewa-orange border-gray-300">
+                        <label for="${q.name}_${option.value}" class="ml-3 block text-base font-medium text-gray-700">${option.label}</label>
                     </div>
-                    <div id="email-field-container" class="${isChecked ? 'visible-fields' : 'hidden-fields'}">
-                        <label for="email" class="block text-gray-700 font-semibold mb-2">Email</label>
-                        <input type="email" id="email" name="email" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your email" value="${data['email'] || ''}">
-                        <span id="emailError" class="error-message text-red-500 text-sm hidden"></span>
+                `;
+            }).join('');
+
+            return `
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">${q.title}</h2>
+                <div id="${q.id}" class="space-y-4">
+                    ${optionsHtml}
+                    
+                    <div id="other-input-container" class="mt-2 pl-6 ${isOtherChecked ? '' : 'hidden'}">
+                        <input id="other_location_text" name="other_location" type="text" value="${otherValue}" placeholder="Please specify" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-sewa-orange focus:border-sewa-orange">
+                        <div id="other_location_textError" class="error-message text-red-500 text-sm mt-1 hidden"></div>
                     </div>
-                </div>`;
-            },
-            setupEvents: (q, { updateData }) => {
-                const nameInput = document.getElementById('name');
-                const checkbox = document.getElementById('newsletterConsent');
-                const emailInput = document.getElementById('email');
-                const emailContainer = document.getElementById('email-field-container');
+                </div>
+                <div id="${q.id}Error" class="error-message text-red-500 text-sm mt-4 hidden"></div>
+            `;
+        },
+        setupEvents: (q, handlers) => {
+            const otherContainer = document.getElementById('other-input-container');
+            const otherInput = document.getElementById('other_location_text');
 
-                if (checkbox.checked) emailInput.setAttribute('required', 'required');
-
-                nameInput.addEventListener('input', (e) => updateData('name', e.target.value));
-                emailInput.addEventListener('input', (e) => updateData('email', e.target.value));
-
-                checkbox.addEventListener('change', (e) => {
-                    updateData('newsletterConsent', e.target.checked ? 'Yes' : 'No');
-
-                    if (e.target.checked) {
-                        emailContainer.classList.remove('hidden-fields');
-                        emailContainer.classList.add('visible-fields');
-                        emailInput.setAttribute('required', 'required');
+            document.querySelectorAll(`input[name="${q.name}"]`).forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const value = e.target.value;
+                    handlers.updateData(q.name, value);
+                    
+                    if (value === 'Other') {
+                        otherContainer.classList.remove('hidden');
+                        otherInput.focus();
                     } else {
-                        emailContainer.classList.remove('visible-fields');
-                        emailContainer.classList.add('hidden-fields');
-                        emailInput.removeAttribute('required');
-                        updateData('email', ''); // Clear and reset email data
+                        otherContainer.classList.add('hidden');
+                        handlers.updateData('other_location', ''); // Clear 'other' data if a standard radio is selected
                     }
                 });
+            });
+
+            if (otherInput) {
+                otherInput.addEventListener('input', (e) => {
+                    handlers.updateData('other_location', e.target.value);
+                });
             }
         }
-    };
+    },
 
-    return { surveyQuestions, questionRenderers };
-})();
+    // --- TEXTAREA RENDERER (q4) ---
+    'textarea': {
+        render: (q, formData) => {
+            const currentValue = formData[q.name] || '';
+            return `
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">${q.title}</h2>
+                <textarea id="${q.name}_input" name="${q.name}" rows="5" placeholder="Enter your comments here..." class="block w-full border border-gray-300 rounded-lg shadow-sm p-4 focus:ring-sewa-orange focus:border-sewa-orange">${currentValue}</textarea>
+                <div id="${q.id}Error" class="error-message text-red-500 text-sm mt-2 hidden"></div>
+            `;
+        },
+        setupEvents: (q, handlers) => {
+            const input = document.getElementById(`${q.name}_input`);
+            if (input) {
+                input.addEventListener('input', (e) => {
+                    handlers.updateData(q.name, e.target.value);
+                });
+            }
+        }
+    },
+
+    // --- CUSTOM CONTACT RENDERER (q5) ---
+    'custom-contact': {
+        render: (q, formData) => {
+            const consent = formData['newsletterConsent'] === 'Yes';
+            const name = formData['name'] || '';
+            const email = formData['email'] || '';
+
+            return `
+                <h2 class="text-2xl font-semibold text-gray-800 mb-2">${q.title}</h2>
+                <p id="rotatingQuestion" class="text-lg text-gray-600 mb-6">${q.rotatingText[0]}</p>
+
+                <div class="flex items-center space-x-3 mb-6">
+                    <input id="consent_checkbox" type="checkbox" name="newsletterConsent" value="Yes" ${consent ? 'checked' : ''} class="w-5 h-5 text-sewa-orange focus:ring-sewa-orange border-gray-300 rounded">
+                    <label for="consent_checkbox" class="text-base font-medium text-gray-700">I would like to receive updates and promotions.</label>
+                </div>
+                
+                <div id="contact_fields" class="space-y-4 p-4 border rounded-lg ${consent ? 'border-sewa-orange' : 'border-gray-200'}">
+                    <div class="form-group">
+                        <label for="name_input" class="block text-sm font-medium text-gray-700">Name (Required if consenting)</label>
+                        <input id="name_input" name="name" type="text" value="${name}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-sewa-orange focus:border-sewa-orange" ${consent ? '' : 'disabled'}>
+                        <div id="nameError" class="error-message text-red-500 text-sm mt-1 hidden"></div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email_input" class="block text-sm font-medium text-gray-700">Email (Required if consenting)</label>
+                        <input id="email_input" name="email" type="email" value="${email}" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-sewa-orange focus:border-sewa-orange" ${consent ? '' : 'disabled'}>
+                        <div id="emailError" class="error-message text-red-500 text-sm mt-1 hidden"></div>
+                    </div>
+                </div>
+                <div id="${q.id}Error" class="error-message text-red-500 text-sm mt-4 hidden"></div>
+            `;
+        },
+        setupEvents: (q, handlers) => {
+            const consentCheckbox = document.getElementById('consent_checkbox');
+            const contactFields = document.getElementById('contact_fields');
+            const nameInput = document.getElementById('name_input');
+            const emailInput = document.getElementById('email_input');
+
+            const toggleFields = (isConsent) => {
+                if (isConsent) {
+                    contactFields.classList.add('border-sewa-orange');
+                    contactFields.classList.remove('border-gray-200');
+                    nameInput.disabled = false;
+                    emailInput.disabled = false;
+                } else {
+                    contactFields.classList.add('border-gray-200');
+                    contactFields.classList.remove('border-sewa-orange');
+                    nameInput.disabled = true;
+                    emailInput.disabled = true;
+                    // Clear data if consent is revoked
+                    handlers.updateData('name', '');
+                    handlers.updateData('email', '');
+                }
+            };
+
+            // 1. Consent Checkbox Event
+            consentCheckbox.addEventListener('change', (e) => {
+                const isConsent = e.target.checked;
+                handlers.updateData('newsletterConsent', isConsent ? 'Yes' : 'No');
+                toggleFields(isConsent);
+            });
+
+            // 2. Input Events
+            nameInput.addEventListener('input', (e) => handlers.updateData('name', e.target.value));
+            emailInput.addEventListener('input', (e) => handlers.updateData('email', e.target.value));
+        }
+    }
+};
+
+
+// Export the data and renderers globally for survey-app.js to use
+window.dataUtils = {
+    surveyQuestions,
+    questionRenderers
+};
