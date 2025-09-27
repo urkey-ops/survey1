@@ -1,4 +1,4 @@
-// --- survey-app.js (VERSION 7: Always Enabled Button Fix) ---
+// --- survey-app.js (VERSION 8: Hardened Data Integrity & Timer Cleanup) ---
 
 // --- CONFIGURATION CONSTANTS ---
 const MAX_RETRIES = 3;
@@ -35,6 +35,18 @@ function safeGetLocalStorage(key) {
 }
 
 /**
+ * Safely writes a JSON item to localStorage with error handling. (NEW)
+ */
+function safeSetLocalStorage(key, value) {
+    try {
+        localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+        // Log error if quota exceeded, preventing silent data loss
+        console.error(`Failed to write to localStorage for key '${key}'. Storage may be full:`, e);
+    }
+}
+
+/**
  * Safely retrieves the submission queue.
  */
 function getSubmissionQueue() {
@@ -45,6 +57,7 @@ function getSubmissionQueue() {
 // 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
+    // CRITICAL: New UUID generated on every initial load
     formData: { id: generateUUID(), timestamp: new Date().toISOString() }, 
     inactivityTimer: null,
     syncTimer: null,
@@ -75,11 +88,11 @@ let questionContainer, nextBtn, prevBtn,
 // ---------------------------------------------------------------------
 
 function saveState() {
-    // Saves the IN-PROGRESS survey only.
-    localStorage.setItem('surveyAppState', JSON.stringify({
+    // Saves the IN-PROGRESS survey only. Uses safeSetLocalStorage (P1)
+    safeSetLocalStorage('surveyAppState', {
         currentQuestionIndex: appState.currentQuestionIndex,
         formData: appState.formData
-    }));
+    });
 }
 
 function updateData(key, value) {
@@ -115,8 +128,32 @@ function updateAdminCount() {
     }
 }
 
+/**
+ * Clears all active application timers. (NEW: P2)
+ * Ensures a clean state before resets or reloads.
+ */
+function clearAllTimers() {
+    if (appState.inactivityTimer) {
+        clearTimeout(appState.inactivityTimer);
+        appState.inactivityTimer = null;
+    }
+    if (appState.postSubmitResetTimer) {
+        clearTimeout(appState.postSubmitResetTimer);
+        appState.postSubmitResetTimer = null;
+    }
+    if (appState.rotationInterval) {
+        clearInterval(appState.rotationInterval);
+        appState.rotationInterval = null;
+    }
+    if (appState.syncTimer) {
+        clearInterval(appState.syncTimer);
+        appState.syncTimer = null;
+    }
+}
+
+
 // ---------------------------------------------------------------------
-// --- VALIDATION & NAVIGATION (Logic Unchanged) ---
+// --- VALIDATION & NAVIGATION ---
 // ---------------------------------------------------------------------
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
@@ -175,6 +212,7 @@ function validateQuestion(q) {
 }
 
 
+// Only clears the rotation interval as other timers are handled by clearAllTimers() (P2)
 function cleanupIntervals() {
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
@@ -203,7 +241,7 @@ function showQuestion(index) {
         
         prevBtn.disabled = index === 0;
         nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-        nextBtn.disabled = false; // Always ensured to be false here
+        nextBtn.disabled = false;
         
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
@@ -248,7 +286,7 @@ function goPrev() {
 /** * Processes the submission queue. Clears the queue only upon successful server sync.
  */
 async function syncData(showAdminFeedback = false) {
-    const submissionQueue = getSubmissionQueue(); // Uses the safe getter
+    const submissionQueue = getSubmissionQueue(); 
 
     if (submissionQueue.length === 0) {
         if (showAdminFeedback && syncStatusMessage) {
@@ -264,7 +302,6 @@ async function syncData(showAdminFeedback = false) {
         syncStatusMessage.textContent = `Syncing ${submissionQueue.length} records... ⏳`;
     }
 
-    // The payload is the entire queue array, ready for the Vercel function.
     const payload = {
         submissions: submissionQueue 
     };
@@ -314,32 +351,31 @@ function autoSync() {
 }
 
 function submitSurvey() {
-    if (appState.rotationInterval) clearInterval(appState.rotationInterval);
-    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
+    // P2: Clear all timers immediately to stop background activity
+    clearAllTimers(); 
 
     // --- Step 1: Queue the Completed Survey ---
-    const submissionQueue = getSubmissionQueue(); // Uses the safe getter
+    const submissionQueue = getSubmissionQueue(); 
     
     // Finalize data before queuing.
     appState.formData.timestamp = new Date().toISOString();
     appState.formData.sync_status = 'unsynced';
     
     submissionQueue.push(appState.formData);
-    localStorage.setItem('submissionQueue', JSON.stringify(submissionQueue));
+    // Uses safeSetLocalStorage (P1)
+    safeSetLocalStorage('submissionQueue', submissionQueue);
 
     // 1. Show thank you message immediately
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
     
-    // --- FIX: Button remains ENABLED to preserve correct CSS styling ---
-    // nextBtn.disabled = true; // REMOVED
+    // Button remains ENABLED (Previous fix)
     prevBtn.disabled = true; 
     
     // 2. Schedule the fast, reliable reset
     appState.postSubmitResetTimer = setTimeout(() => {
-        // CRITICAL FIX: Ensure the in-progress state is set to Question 1 (Index 0)
+        // P3: Ensure the next session gets a fresh UUID by forcing a full state rebuild.
         appState.currentQuestionIndex = 0; 
         
-        // Clear only the IN-PROGRESS state, leaving the queue intact.
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
     }, RESET_DELAY_MS); 
@@ -347,12 +383,12 @@ function submitSurvey() {
 
 
 // ---------------------------------------------------------------------
-// --- TIMERS & UX (Updated for Fast Reset) ---
+// --- TIMERS & UX ---
 // ---------------------------------------------------------------------
 
 function resetInactivityTimer() {
-    if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
-    if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
+    // P2: Clear existing timers
+    clearAllTimers();
 
     appState.inactivityTimer = setTimeout(() => {
         
@@ -362,17 +398,18 @@ function resetInactivityTimer() {
              console.log('Mid-survey inactivity detected. Auto-saving and resetting kiosk.');
              
              // --- Step 1: Queue the Abandoned Survey ---
-             const submissionQueue = getSubmissionQueue(); // Uses the safe getter
+             const submissionQueue = getSubmissionQueue(); 
              
              // Finalize data before reset.
              appState.formData.timestamp = new Date().toISOString();
              appState.formData.sync_status = 'unsynced (inactivity)';
              
              submissionQueue.push(appState.formData);
-             localStorage.setItem('submissionQueue', JSON.stringify(submissionQueue));
+             // Uses safeSetLocalStorage (P1)
+             safeSetLocalStorage('submissionQueue', submissionQueue);
 
-             // --- Step 3: Fast Reset (autoSync call removed) ---
-             // CRITICAL FIX: Ensure the in-progress state is set to Question 1 (Index 0)
+             // --- Step 2: Fast Reset ---
+             // P3: Ensure the next session gets a fresh UUID
              appState.currentQuestionIndex = 0; 
 
              localStorage.removeItem('surveyAppState');
@@ -385,6 +422,7 @@ function resetInactivityTimer() {
 }
 
 function startPeriodicSync() {
+    // P2: Uses clearAllTimers() to clear the syncTimer before starting a new one.
     if (appState.syncTimer) clearInterval(appState.syncTimer);
     appState.syncTimer = setInterval(autoSync, SYNC_INTERVAL_MS);
 }
@@ -394,7 +432,7 @@ function rotateQuestionText(q) {
     const labelEl = document.getElementById('rotatingQuestion');
     if (!labelEl) return;
     
-    cleanupIntervals();
+    cleanupIntervals(); // Clears only rotation interval
     
     appState.rotationInterval = setInterval(() => {
         idx = (idx + 1) % q.rotatingText.length;
@@ -430,6 +468,9 @@ function setupAdminAccess() {
     // Clear Local Data Button (Clears In-Progress and the Queue)
     adminClearButton.addEventListener('click', () => {
         if (confirm("WARNING: Are you sure you want to delete ALL local survey data (Queue AND In-Progress)? This is permanent.")) {
+            // P2: Clear all timers before reload
+            clearAllTimers();
+            
             localStorage.removeItem('surveyAppState');
             localStorage.removeItem('submissionQueue'); 
             window.location.reload();
