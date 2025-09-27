@@ -1,9 +1,19 @@
 // --- survey-app.js (FINAL VERSION - Kiosk Ready with Hidden Admin - FIXED) ---
 
-// 1. GLOBAL STATE DEFINITION
+// --- UTILITIES & STATE MANAGEMENT ---
+// Function to generate a simple UUID (NEW UTILITY)
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+// ---------------------------------------------------------------------
+
+// 1. GLOBAL STATE DEFINITION (UPDATED: ID generated at start)
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    // Add a unique ID to the form data to ensure each submission is trackable on the server and client
+    // CRITICAL FIX 1: Generate UUID here, ensuring it's the very first data point.
     formData: { id: generateUUID(), timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
     inactivityTimer: null,
     syncTimer: null,
@@ -30,16 +40,9 @@ let questionContainer, nextBtn, prevBtn,
 
 
 // ---------------------------------------------------------------------
-// --- UTILITIES & STATE MANAGEMENT (Updated) ---
+// --- UTILITIES & STATE MANAGEMENT ---
 // ---------------------------------------------------------------------
-
-// Function to generate a simple UUID (NEW)
-function generateUUID() {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
+// (generateUUID function is now above for clarity)
 
 function saveState() {
     localStorage.setItem('surveyAppState', JSON.stringify({
@@ -51,7 +54,6 @@ function saveState() {
 function updateData(key, value) {
     if (appState.formData[key] !== value) {
         appState.formData[key] = value;
-        // Keep the sync status set to unsynced whenever data changes
         appState.formData.sync_status = 'unsynced';
         saveState();
     }
@@ -160,6 +162,8 @@ function showQuestion(index) {
         questionContainer.innerHTML = renderer.render(q, appState.formData);
         
         if (renderer.setupEvents) {
+            // NOTE ON FIX #5/7: The innerHTML replacement *should* remove old listeners 
+            // from elements inside the container. We trust the renderers for now.
             renderer.setupEvents(q, { 
                 handleNextQuestion: goNext, 
                 updateData: updateData 
@@ -210,7 +214,7 @@ function goPrev() {
 
 
 // ---------------------------------------------------------------------
-// --- SYNC & SUBMISSION LOGIC (Updated for ID and Reset Reliability) ---
+// --- SYNC & SUBMISSION LOGIC ---
 // ---------------------------------------------------------------------
 
 /** * Silent Sync Logic: Performs API call with retries. 
@@ -240,7 +244,7 @@ async function syncData(showAdminFeedback = false) {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // FIX 2: Correct the API endpoint URL
+            // FIX 2: Correct the API endpoint URL from '/api/survey-sync' to the actual file path.
             const response = await fetch('/api/submit-survey', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -287,14 +291,11 @@ function autoSync() {
 }
 
 function submitSurvey() {
-    // CRITICAL: Ensure the current submission has a unique ID before being archived locally.
-    // This addresses the data integrity and ensures a clear record for the server.
-    if (!appState.formData.id) {
-        updateData('id', generateUUID()); 
-    }
-    
     // FIX 3 START: Decouple sync from reset. Let the periodic/manual sync handle the data.
-    // The kiosk must prioritize being ready for the next user.
+    
+    // CRITICAL: Ensure the current timestamp is final before we reset the kiosk.
+    // The ID is now generated in DEFAULT_STATE.
+    updateData('timestamp', new Date().toISOString());
     
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
@@ -323,7 +324,6 @@ function submitSurvey() {
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
     
-    // The postSubmitResetTimer is handled outside of inactivity, so we keep this clear
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer);
 
     appState.inactivityTimer = setTimeout(() => {
@@ -333,10 +333,8 @@ function resetInactivityTimer() {
         if (isInProgress) {
               console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
               
-              // CRITICAL: Generate ID for incomplete survey before saving/syncing
-              if (!appState.formData.id) {
-                  updateData('id', generateUUID()); 
-              }
+              // CRITICAL: Finalize data before reset, ID is already present from initial state.
+              updateData('timestamp', new Date().toISOString());
 
               saveState(); 
               autoSync(); // Runs in the background, doesn't block the reset
@@ -344,6 +342,7 @@ function resetInactivityTimer() {
               localStorage.removeItem('surveyAppState');
               window.location.reload();
         } else {
+              // Only save/sync if not in progress (i.e., on the landing screen)
               saveState();
               autoSync();
         }
