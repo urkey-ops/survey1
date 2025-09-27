@@ -41,8 +41,6 @@ function getSubmissionQueue() {
     return safeGetLocalStorage('submissionQueue') || [];
 }
 
-// ... (remaining unchanged initialization and utility functions)
-
 // --- VALIDATION & NAVIGATION ---
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -115,6 +113,7 @@ function showQuestion(index) {
         prevBtn.disabled = index === 0;
         nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
         nextBtn.disabled = false;  // Always enabled on question display
+        nextBtn.classList.remove('button-disabled-style'); // Remove visual disable style on show
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
         questionContainer.innerHTML = '<h2 class="text-xl font-bold text-red-600">A critical error occurred. Please refresh.</h2>';
@@ -123,9 +122,15 @@ function showQuestion(index) {
 
 function goNext() {
     const currentQuestion = window.dataUtils.surveyQuestions[appState.currentQuestionIndex];
+
     if (!validateQuestion(currentQuestion)) {
-        return; // Do not disable; just prevent advancing
+        // Add visual disabled style but keep button enabled
+        nextBtn.classList.add('button-disabled-style');
+        return; // Prevent progression
     }
+    // Remove visual disabled style on valid
+    nextBtn.classList.remove('button-disabled-style');
+
     cleanupIntervals();
     clearErrors();
 
@@ -174,6 +179,3 @@ function submitSurvey() {
         }
     }, 1000);
 }
-
-// ... (rest unchanged)
-
