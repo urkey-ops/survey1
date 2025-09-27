@@ -1,16 +1,15 @@
-// --- survey-app.js (Clean Version - Offline-First + Validation) ---
+// --- survey-app.js (Final Production & Resilient Version) ---
 
-// 1. STATE INITIALIZATION (Offline-First)
+// 1. GLOBAL STATE DEFINITION
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
-    // Add a status to track if data needs to be synced and a timestamp for unique ID/ordering
     formData: { timestamp: new Date().toISOString(), sync_status: 'unsynced' }, 
     inactivityTimer: null,
-    syncTimer: null
+    syncTimer: null,
+    rotationInterval: null, // Timer reference for rotation
 };
 
 // Retrieve state from LocalStorage or use default
-// Note: We only restore simple values like index and formData; timers are initialized fresh.
 const savedState = JSON.parse(localStorage.getItem('surveyAppState'));
 const appState = { 
     ...DEFAULT_STATE, 
@@ -20,14 +19,12 @@ const appState = {
     } : {})
 };
 
-// Get references
-const questionContainer = document.getElementById('question-container');
-const nextBtn = document.getElementById('next-btn');
-const prevBtn = document.getElementById('prev-btn');
+// Global variables for DOM elements (Assigned inside DOMContentLoaded)
+let questionContainer, nextBtn, prevBtn, syncStatusIndicator;
 
-// --- STATE MANAGEMENT UTILITIES ---
 
-/** Saves the current index and form data to LocalStorage. */
+// --- UTILITIES & STATE MANAGEMENT ---
+
 function saveState() {
     localStorage.setItem('surveyAppState', JSON.stringify({
         currentQuestionIndex: appState.currentQuestionIndex,
@@ -35,20 +32,15 @@ function saveState() {
     }));
 }
 
-/** * The only way to modify formData and trigger a save. 
- * This function is passed to the utility module (data-util.js).
- */
 function updateData(key, value) {
-    // Only update if the value has changed
     if (appState.formData[key] !== value) {
         appState.formData[key] = value;
-        // Mark as unsynced whenever data is changed
         appState.formData.sync_status = 'unsynced';
         saveState();
+        updateSyncStatusUI('unsynced');
     }
 }
 
-// Utility function to clear errors
 function clearErrors() {
     document.querySelectorAll('.error-message').forEach(el => {
         el.textContent = '';
@@ -56,32 +48,73 @@ function clearErrors() {
     });
 }
 
+// Update a visible indicator for administrators
+function updateSyncStatusUI(status) {
+    if (!syncStatusIndicator) return;
+
+    let text, color;
+    switch (status) {
+        case 'synced':
+            text = 'Synced ✅';
+            color = 'text-green-600';
+            break;
+        case 'unsynced':
+            text = 'Unsynced 🔄';
+            color = 'text-yellow-600';
+            break;
+        case 'syncing':
+            text = 'Syncing... ⏳';
+            color = 'text-gray-500';
+            break;
+        case 'failed':
+            text = 'Sync Failed ⚠️';
+            color = 'text-red-600';
+            break;
+        default:
+            text = '';
+            color = 'text-gray-500';
+    }
+    syncStatusIndicator.textContent = text;
+    syncStatusIndicator.className = `absolute top-0 right-0 p-2 text-sm font-bold ${color}`;
+}
+
 // --- VALIDATION LOGIC ---
 
-/** Validates the current question before allowing navigation. */
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
+
 function validateQuestion(q) {
     clearErrors();
     const answer = appState.formData[q.name];
     let isValid = true;
     let errorMessage = '';
 
-    // A. Check basic required fields (based on the 'required' flag in data-util.js)
+    // Helper to display error safely (Robustness fix against missing IDs)
+    const displayError = (id, message) => {
+        const errorEl = document.getElementById(id);
+        if (errorEl) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        } else {
+            console.warn(`Validation Error: Missing HTML element for ID '${id}' in question '${q.id}'`);
+        }
+    };
+
+    // A. Check basic required fields 
     if (q.required && (!answer || (typeof answer === 'string' && answer.trim() === ''))) {
         errorMessage = 'This response is required.';
         isValid = false;
     }
 
-    // B. Handle specific complex validation for 'radio-with-other'
+    // B. Handle 'radio-with-other' validation
     if (q.type === 'radio-with-other' && answer === 'Other') {
         const otherValue = appState.formData['other_location'];
         if (!otherValue || otherValue.trim() === '') {
-             document.getElementById('other_location_textError').textContent = 'Please specify your location.';
-             document.getElementById('other_location_textError').classList.remove('hidden');
+             displayError('other_location_textError', 'Please specify your location.');
              isValid = false;
         }
     }
     
-    // C. Handle custom-contact validation (Name and Email if consent is given)
+    // C. Handle custom-contact validation
     if (q.type === 'custom-contact') {
         const consent = appState.formData['newsletterConsent'] === 'Yes';
         const name = appState.formData['name'];
@@ -89,175 +122,184 @@ function validateQuestion(q) {
         
         if (consent) {
             if (!name) {
-                document.getElementById('nameError').textContent = 'Name is required for contact.';
-                document.getElementById('nameError').classList.remove('hidden');
+                displayError('nameError', 'Name is required for contact.');
                 isValid = false;
             }
-            // Basic email check: must exist and contain an @ symbol
-            if (!email || !email.includes('@')) { 
-                document.getElementById('emailError').textContent = 'Valid email is required.';
-                document.getElementById('emailError').classList.remove('hidden');
+            if (!email || !emailRegex.test(email)) { 
+                displayError('emailError', 'Please enter a valid email address.');
                 isValid = false;
             }
         }
     }
 
     if (!isValid && errorMessage) {
-        // Display generic error for standard fields
-        document.getElementById(q.id + 'Error').textContent = errorMessage;
-        document.getElementById(q.id + 'Error').classList.remove('hidden');
+        displayError(q.id + 'Error', errorMessage);
     }
     
     return isValid;
 }
 
+
 // --- NAVIGATION & RENDERING ---
 
-/** Shows the question at the specified index. */
-function showQuestion(index) {
-    clearErrors();
-    const q = window.dataUtils.surveyQuestions[index];
-    const renderer = window.dataUtils.questionRenderers[q.type];
-
-    questionContainer.innerHTML = renderer.render(q, appState.formData);
-    
-    // **KEY CHANGE:** Inject the decoupled updateData function
-    if (renderer.setupEvents) {
-        renderer.setupEvents(q, { 
-            handleNextQuestion: goNext, 
-            updateData: updateData // Injecting the state setter
-        });
+/** Ensures no intervals are running before rendering new content. */
+function cleanupIntervals() {
+    // 3. Clear rotation interval explicitly and set reference to null (Fix for leaks)
+    if (appState.rotationInterval) {
+        clearInterval(appState.rotationInterval);
+        appState.rotationInterval = null;
     }
-
-    // Rotate text if applicable
-    if (q.rotatingText) {
-        rotateQuestionText(q);
-    }
-    
-    // Update navigation buttons
-    prevBtn.disabled = index === 0;
-    nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
-    nextBtn.disabled = false;
 }
 
-/** Handles moving to the next question, only after validation passes. */
+function showQuestion(index) {
+    try {
+        clearErrors();
+        const q = window.dataUtils.surveyQuestions[index];
+        const renderer = window.dataUtils.questionRenderers[q.type];
+
+        questionContainer.innerHTML = renderer.render(q, appState.formData);
+        
+        if (renderer.setupEvents) {
+            renderer.setupEvents(q, { 
+                handleNextQuestion: goNext, 
+                updateData: updateData 
+            });
+        }
+
+        if (q.rotatingText) {
+            rotateQuestionText(q);
+        }
+        
+        prevBtn.disabled = index === 0;
+        nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
+        nextBtn.disabled = false;
+    } catch (e) {
+        console.error("Fatal Error during showQuestion render:", e);
+        // Display a generic error to the user if rendering fails
+        questionContainer.innerHTML = '<h2 class="text-xl font-bold text-red-600">A critical error occurred. Please refresh.</h2>';
+    }
+}
+
 function goNext() {
     const currentQuestion = window.dataUtils.surveyQuestions[appState.currentQuestionIndex];
     
-    // 1. VALIDATION CHECK (Crucial for required fields)
     if (!validateQuestion(currentQuestion)) {
-        return; // Validation failed, stop and show error
+        return; 
     }
 
-    // 2. Clear errors and proceed
+    cleanupIntervals(); // Clear rotation interval before navigation
+    
     clearErrors();
     
     if (appState.currentQuestionIndex < window.dataUtils.surveyQuestions.length - 1) {
         appState.currentQuestionIndex++;
-        saveState(); // Save current index
+        saveState();
         showQuestion(appState.currentQuestionIndex);
     } else {
-        submitSurvey(); // Finalize submission
+        submitSurvey();
     }
 }
 
-/** Handles moving to the previous question. */
 function goPrev() {
     if (appState.currentQuestionIndex > 0) {
+        cleanupIntervals(); // Clear rotation interval before navigation
+        
         appState.currentQuestionIndex--;
-        saveState(); // Save current index
+        saveState();
         showQuestion(appState.currentQuestionIndex);
     }
 }
+
 
 // --- SYNC & SUBMISSION LOGIC ---
 
-/** Placeholder for the Vercel Function API call to sync data. */
 async function syncData() {
     if (appState.formData.sync_status !== 'unsynced') {
-        // console.log('No unsynced data found.');
         return true;
     }
     
-    console.log(`Attempting to sync data (ID: ${appState.formData.timestamp}) to Vercel/Google Sheets.`);
-    
-    // 1. Call your Vercel Function API here
-    // Example: 
-    /*
-    try {
-        const response = await fetch('/api/survey-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(appState.formData)
-        });
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        console.log('Data successfully synced.');
-        appState.formData.sync_status = 'synced';
-        saveState();
-        return true;
-    } catch (error) {
-        console.error('Data sync failed:', error);
-        return false;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY_MS = 2000;
+    let lastError = null;
+
+    updateSyncStatusUI('syncing');
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const response = await fetch('/api/survey-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(appState.formData)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned status: ${response.status}`);
+            }
+            
+            appState.formData.sync_status = 'synced';
+            saveState();
+            updateSyncStatusUI('synced');
+            return true;
+            
+        } catch (error) {
+            lastError = error;
+            if (attempt < MAX_RETRIES) {
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+            }
+        }
     }
-    */
+
+    // Final Failure Handling (Points 5 & 6)
+    console.error(`Data sync failed permanently after ${MAX_RETRIES} attempts. Error: ${lastError.message}`);
+    updateSyncStatusUI('failed');
     
-    // Mock success for now
-    const success = true; 
-    if (success) {
-        console.log('Data successfully synced (Mock).');
-        appState.formData.sync_status = 'synced';
-        saveState();
-        return true;
-    }
+    // Notify the admin/user that data is stuck offline
+    alert("CRITICAL WARNING: Data sync failed after multiple retries. Data is safe locally, but requires manual attention (check network/server log).");
+    
     return false;
 }
 
-/** Triggers an auto-sync (used by periodic and inactivity timers). */
 function autoSync() {
     syncData();
 }
 
-/** Handles survey submission, triggers final sync, and updates UI. */
 function submitSurvey() {
-    // 1. Final sync attempt
     syncData(); 
 
-    // 2. Display confirmation and disable navigation
+    // Final cleanup of timers
+    if (appState.rotationInterval) clearInterval(appState.rotationInterval);
+    if (appState.syncTimer) clearInterval(appState.syncTimer);
+
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Data is saved locally and syncing.</h2>';
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
-    // 3. Optional: Clear the state to prepare for the next in-house user.
+    // **4. Clean Start Option:** Uncomment this line for a fresh start for the next user.
     // localStorage.removeItem('surveyAppState'); 
 }
 
+
 // --- TIMERS & UX ---
 
-/** Resets the inactivity timer and triggers a partial auto-sync upon timeout. */
 function resetInactivityTimer() {
     if (appState.inactivityTimer) clearTimeout(appState.inactivityTimer);
     appState.inactivityTimer = setTimeout(() => {
-        console.log('User inactive. Auto-saving and triggering partial sync.');
         saveState(); 
-        autoSync(); // Auto-sync partial data
-    }, 300000); // 5 minutes (300,000 ms)
+        autoSync(); 
+    }, 300000); // 5 minutes
 }
 
-/** Starts the periodic data sync timer. */
 function startPeriodicSync() {
     if (appState.syncTimer) clearInterval(appState.syncTimer);
     appState.syncTimer = setInterval(autoSync, 15 * 60 * 1000); // 15 minutes
 }
 
-/** Rotates the text for Question 1 for visual interest. */
 function rotateQuestionText(q) {
     let idx = 0;
     const labelEl = document.getElementById('rotatingQuestion');
     if (!labelEl) return;
     
-    // Clear any existing interval to prevent overlap
-    if (appState.rotationInterval) clearInterval(appState.rotationInterval); 
+    cleanupIntervals(); // Clear existing rotation interval
     
     appState.rotationInterval = setInterval(() => {
         idx = (idx + 1) % q.rotatingText.length;
@@ -266,15 +308,31 @@ function rotateQuestionText(q) {
 }
 
 
-// --- INITIALIZATION ---
+// --- INITIALIZATION (DOM Ready) ---
 
-// Event listeners for user activity and navigation
-nextBtn.addEventListener('click', goNext);
-prevBtn.addEventListener('click', goPrev);
-document.addEventListener('mousemove', resetInactivityTimer);
-document.addEventListener('keydown', resetInactivityTimer);
+document.addEventListener('DOMContentLoaded', () => {
+    
+    // 1. Assign DOM elements
+    questionContainer = document.getElementById('question-container');
+    nextBtn = document.getElementById('next-btn');
+    prevBtn = document.getElementById('prev-btn');
+    // **2. New Element:** Assign the sync indicator
+    syncStatusIndicator = document.getElementById('sync-status-indicator'); 
+    
+    if (!questionContainer || !nextBtn || !prevBtn) {
+        console.error("CRITICAL ERROR: Missing essential HTML elements. Survey cannot start.");
+        return; 
+    }
 
-// Start the application flow
-showQuestion(appState.currentQuestionIndex);
-resetInactivityTimer();
-startPeriodicSync();
+    // Event listeners 
+    nextBtn.addEventListener('click', goNext);
+    prevBtn.addEventListener('click', goPrev);
+    document.addEventListener('mousemove', resetInactivityTimer);
+    document.addEventListener('keydown', resetInactivityTimer);
+
+    // Start the application flow
+    showQuestion(appState.currentQuestionIndex);
+    resetInactivityTimer();
+    startPeriodicSync();
+    updateSyncStatusUI(appState.formData.sync_status);
+});
