@@ -75,7 +75,7 @@ function updateAdminCount() {
 }
 
 // ---------------------------------------------------------------------
-// --- VALIDATION & NAVIGATION (UNCHANGED) ---
+// --- VALIDATION & NAVIGATION (REVERTED TO PREVIOUS WORKING VERSION) ---
 // ---------------------------------------------------------------------
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
@@ -200,7 +200,7 @@ function goPrev() {
 
 
 // ---------------------------------------------------------------------
-// --- SYNC & SUBMISSION LOGIC ---
+// --- SYNC & SUBMISSION LOGIC (Updated for Admin Feedback) ---
 // ---------------------------------------------------------------------
 
 /** * Silent Sync Logic: Performs API call with retries. 
@@ -266,25 +266,21 @@ async function syncData(showAdminFeedback = false) {
 }
 
 function autoSync() {
-    // Background sync runs silently
+    // Background sync runs silently (default argument is false)
     syncData(false);
 }
 
 function submitSurvey() {
-    // Attempt final sync (silently)
     syncData(); 
 
-    // Clear all timers
     if (appState.rotationInterval) clearInterval(appState.rotationInterval);
     if (appState.syncTimer) clearInterval(appState.syncTimer);
     if (appState.postSubmitResetTimer) clearTimeout(appState.postSubmitResetTimer); 
 
-    // Display thank you message
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey! Kiosk resetting in 5 seconds.</h2>';
     nextBtn.disabled = true;
     prevBtn.disabled = true;
     
-    // Auto-Reset after Completion
     appState.postSubmitResetTimer = setTimeout(() => {
         localStorage.removeItem('surveyAppState'); 
         window.location.reload(); 
@@ -293,7 +289,7 @@ function submitSurvey() {
 
 
 // ---------------------------------------------------------------------
-// --- TIMERS & UX ---
+// --- TIMERS & UX (Updated for Two-Way Auto-Reset) ---
 // ---------------------------------------------------------------------
 
 function resetInactivityTimer() {
@@ -308,15 +304,12 @@ function resetInactivityTimer() {
         if (isInProgress) {
              console.log('Mid-survey inactivity detected. Auto-saving, syncing, and resetting kiosk.');
              
-             // Save and sync partial data (silently)
              saveState(); 
              autoSync();
              
-             // Force reset
              localStorage.removeItem('surveyAppState');
              window.location.reload();
         } else {
-             // If on Q1 and inactive, just save/sync and wait for the next interaction/timer
              saveState();
              autoSync();
         }
@@ -343,7 +336,7 @@ function rotateQuestionText(q) {
 
 
 // ---------------------------------------------------------------------
-// --- ADMIN ACCESS LOGIC ---
+// --- ADMIN ACCESS LOGIC (Updated for Visibility and Feedback) ---
 // ---------------------------------------------------------------------
 
 function setupAdminAccess() {
