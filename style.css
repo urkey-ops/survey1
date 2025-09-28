@@ -146,9 +146,10 @@ button:disabled {
   to { transform: rotate(360deg); }
 }
 
-/* This is all you need to override the gray */
+/* Ensure the ID selector is used to match the button's ID for maximum specificity */
 #next-button:disabled {
-    background-color: #ff8c00; /* Re-applies your orange */
-    opacity: 0.5;              /* Fades it slightly to look inactive */
-    cursor: not-allowed;       /* Optional, but good UX */
+    background-color: #ff8c00 !important; /* Forces orange background */
+    color: #ffffff;                      /* Keeps text white */
+    opacity: 0.5;                        /* Visually signals 'disabled' */
+    cursor: not-allowed;                 /* Ensures correct cursor */
 }
