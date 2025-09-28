@@ -1,4 +1,4 @@
-// --- data-util.js (Final Version) ---
+// --- data-util.js (Updated Version) ---
 window.dataUtils = (function() {
 
     // Configuration data structure
@@ -7,14 +7,14 @@ window.dataUtils = (function() {
             id: 'comments',
             name: 'comments',
             type: 'textarea',
-            question: '1. What did you like about your visit today?',
+            question: '1. What did you enjoy most about your visit today?',
             placeholder: 'Type your comments here...',
             required: true,
             rotatingText: [
-                "1. What did you like about your visit today?",
-                "1. What could we do better during your next visit?",
-                "1. Do you have any general comments or suggestions?",
-                "1. What was the most memorable part of your experience?"
+                "What did you enjoy most about your visit today?",
+                "Which part of your visit made you happiest?",
+                "What was the most memorable part of your experience today?",
+                "Which aspects of your visit exceeded your expectations?"
             ]
         },
         {
@@ -25,7 +25,8 @@ window.dataUtils = (function() {
             options: [
                 { value: 'Sad', label: 'Sad', emoji: '😞' },
                 { value: 'Neutral', label: 'Neutral', emoji: '😐' },
-                { value: 'Happy', label: 'Happy', emoji: '😊' }
+                { value: 'Happy', label: 'Happy', emoji: '🙂' },
+                { value: 'Super Happy', label: 'Super Happy', emoji: '😄' }
             ],
             required: true
         },
@@ -54,10 +55,10 @@ window.dataUtils = (function() {
             type: 'radio-with-other',
             question: 'Where are you visiting from today?',
             options: [
-                { value: 'Lilburn/Gwinnett County', label: 'Lilburn/Gwinnett County' },
+                { value: 'Lilburn/Gwinnett County', label: 'Lilburn / Gwinnett County' },
                 { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
-                { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside GA)' },
-                { value: 'United States (outside GA)', label: 'United States (outside GA)' },
+                { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside Atlanta)' },
+                { value: 'United States (outside Georgia)', label: 'United States (outside Georgia)' },
                 { value: 'Canada', label: 'Canada' },
                 { value: 'India', label: 'India' },
                 { value: 'Other', label: 'Other' }
@@ -71,9 +72,10 @@ window.dataUtils = (function() {
             question: 'Which age group do you belong to?',
             options: [
                 { value: 'Under 18', label: 'Under 18' },
-                { value: '18-40', label: '18-40' },
-                { value: '40-65', label: '40-65' },
-                { value: '65+', label: '65+' },
+                { value: '18-29', label: '18–29' },
+                { value: '30-49', label: '30–49' },
+                { value: '50-64', label: '50–64' },
+                { value: '65+', label: '65+' }
             ],
             required: true
         },
@@ -188,11 +190,10 @@ window.dataUtils = (function() {
                         
                         if (e.target.value === 'Other') {
                             otherContainer.classList.remove('hidden');
-                            // Ensure 'other' input changes are tracked
                             otherInput.oninput = (event) => updateData('other_location', event.target.value);
                         } else {
                             otherContainer.classList.add('hidden');
-                            updateData('other_location', ''); // Clear and reset 'other' data
+                            updateData('other_location', '');
                             setTimeout(() => handleNextQuestion(), 50);
                         }
                     });
@@ -263,7 +264,7 @@ window.dataUtils = (function() {
                         emailContainer.classList.remove('visible-fields');
                         emailContainer.classList.add('hidden-fields');
                         emailInput.removeAttribute('required');
-                        updateData('email', ''); // Clear and reset email data
+                        updateData('email', '');
                     }
                 });
             }
