@@ -145,3 +145,10 @@ button:disabled {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* This is all you need to override the gray */
+#next-button:disabled {
+    background-color: #ff8c00; /* Re-applies your orange */
+    opacity: 0.5;              /* Fades it slightly to look inactive */
+    cursor: not-allowed;       /* Optional, but good UX */
+}
