@@ -4,6 +4,7 @@
   "description": "A Vercel Function for the survey app.",
   "private": true,
   "license": "UNLICENSED",
+  "type": "module",  <-- ADDED THIS CRITICAL LINE
   "dependencies": {
     "googleapis": "^142.0.0"
   },
