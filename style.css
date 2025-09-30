@@ -147,9 +147,9 @@ button:disabled {
 }
 
 /* Ensure the ID selector is used to match the button's ID for maximum specificity */
-#next-button:disabled {
+#nextBtn:disabled {
     background-color: #ff8c00 !important; /* Forces orange background */
     color: #ffffff;                      /* Keeps text white */
-    opacity: 0.5;                        /* Visually signals 'disabled' */
-    cursor: not-allowed;                 /* Ensures correct cursor */
+    opacity: 0.5;                         /* Visually signals 'disabled' */
+    cursor: not-allowed;                  /* Ensures correct cursor */
 }
