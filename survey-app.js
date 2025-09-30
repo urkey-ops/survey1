@@ -1,4 +1,4 @@
-// --- survey-app.js (VERSION 9: Graceful Countdown Reset) ---
+// --- survey-app.js (VERSION 10: Sync Lock, Constants & Progress Bar) ---
 
 // --- CONFIGURATION CONSTANTS ---
 const MAX_RETRIES = 3;
@@ -6,6 +6,8 @@ const RETRY_DELAY_MS = 2000;
 const INACTIVITY_TIMEOUT_MS = 30000; // 30 Seconds
 const SYNC_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const RESET_DELAY_MS = 5000; // 5 seconds post-submission
+const STORAGE_KEY_QUEUE = 'submissionQueue';
+const STORAGE_KEY_STATE = 'surveyAppState';
 
 // --- UTILITIES & STATE MANAGEMENT ---
 // Function to generate a simple UUID
@@ -50,7 +52,7 @@ function safeSetLocalStorage(key, value) {
  * Safely retrieves the submission queue.
  */
 function getSubmissionQueue() {
-    return safeGetLocalStorage('submissionQueue') || [];
+    return safeGetLocalStorage(STORAGE_KEY_QUEUE) || [];
 }
 // ---------------------------------------------------------------------
 
@@ -58,38 +60,39 @@ function getSubmissionQueue() {
 const DEFAULT_STATE = {
     currentQuestionIndex: 0,
     // CRITICAL: New UUID generated on every initial load
-    formData: { id: generateUUID(), timestamp: new Date().toISOString() }, 
+    formData: { id: generateUUID(), timestamp: new Date().toISOString() },
     inactivityTimer: null,
     syncTimer: null,
-    rotationInterval: null, 
-    // postSubmitResetTimer removed, logic moved to a local variable in submitSurvey
-    adminClickCount: 0 
+    rotationInterval: null,
+    adminClickCount: 0
 };
 
 // Retrieve IN-PROGRESS state safely
-const savedState = safeGetLocalStorage('surveyAppState');
-const appState = { 
-    ...DEFAULT_STATE, 
-    ...(savedState ? { 
-        currentQuestionIndex: savedState.currentQuestionIndex || 0, 
-        formData: savedState.formData || DEFAULT_STATE.formData 
+const savedState = safeGetLocalStorage(STORAGE_KEY_STATE);
+const appState = {
+    ...DEFAULT_STATE,
+    ...(savedState ? {
+        currentQuestionIndex: savedState.currentQuestionIndex || 0,
+        formData: savedState.formData || DEFAULT_STATE.formData
     } : {})
 };
 
 // Global variables for DOM elements (Assigned inside DOMContentLoaded)
-let questionContainer, nextBtn, prevBtn, 
-    mainTitle, adminControls, unsyncedCountDisplay, 
+let questionContainer, nextBtn, prevBtn,
+    mainTitle, adminControls, unsyncedCountDisplay,
     syncButton, adminClearButton, hideAdminButton,
-    syncStatusMessage; 
+    syncStatusMessage, progressBar;
 
+// Global flag to prevent concurrent sync operations
+let isSyncing = false;
 
 // ---------------------------------------------------------------------
 // --- UTILITIES & STATE MANAGEMENT ---
 // ---------------------------------------------------------------------
 
 function saveState() {
-    // Saves the IN-PROGRESS survey only. Uses safeSetLocalStorage (P1)
-    safeSetLocalStorage('surveyAppState', {
+    // Saves the IN-PROGRESS survey only.
+    safeSetLocalStorage(STORAGE_KEY_STATE, {
         currentQuestionIndex: appState.currentQuestionIndex,
         formData: appState.formData
     });
@@ -117,7 +120,7 @@ function updateAdminCount() {
     if (unsyncedCountDisplay) {
         const count = countUnsyncedRecords();
         unsyncedCountDisplay.textContent = `Unsynced Records: ${count}`;
-        
+
         if (count > 0) {
             unsyncedCountDisplay.classList.remove('text-green-600');
             unsyncedCountDisplay.classList.add('text-red-600');
@@ -129,7 +132,7 @@ function updateAdminCount() {
 }
 
 /**
- * Clears all active application timers. (P2)
+ * Clears all active application timers.
  * Ensures a clean state before resets or reloads.
  */
 function clearAllTimers() {
@@ -137,8 +140,6 @@ function clearAllTimers() {
         clearTimeout(appState.inactivityTimer);
         appState.inactivityTimer = null;
     }
-    // Removed postSubmitResetTimer clear, as that variable is now unused/local
-    
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
         appState.rotationInterval = null;
@@ -149,12 +150,28 @@ function clearAllTimers() {
     }
 }
 
+/**
+ * [NEW] Updates the visual progress bar based on the current question.
+ */
+function updateProgressBar() {
+    if (!progressBar) return;
+
+    const totalQuestions = window.dataUtils.surveyQuestions.length;
+    // Handle division by zero if questions aren't loaded
+    if (totalQuestions === 0) return;
+
+    // Progress is based on the number of questions *viewed*, so index + 1
+    const progressPercentage = Math.min(((appState.currentQuestionIndex + 1) / totalQuestions) * 100, 100);
+
+    progressBar.style.width = `${progressPercentage}%`;
+}
+
 
 // ---------------------------------------------------------------------
 // --- VALIDATION & NAVIGATION ---
 // ---------------------------------------------------------------------
 
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validateQuestion(q) {
     clearErrors();
@@ -180,22 +197,22 @@ function validateQuestion(q) {
     if (q.type === 'radio-with-other' && answer === 'Other') {
         const otherValue = appState.formData['other_location'];
         if (!otherValue || otherValue.trim() === '') {
-             displayError('other_location_textError', 'Please specify your location.');
-             isValid = false;
+            displayError('other_location_textError', 'Please specify your location.');
+            isValid = false;
         }
     }
-    
+
     if (q.type === 'custom-contact') {
         const consent = appState.formData['newsletterConsent'] === 'Yes';
         const name = appState.formData['name'];
         const email = appState.formData['email'];
-        
+
         if (consent) {
             if (!name) {
                 displayError('nameError', 'Name is required for contact.');
                 isValid = false;
             }
-            if (!email || !emailRegex.test(email)) { 
+            if (!email || !emailRegex.test(email)) {
                 displayError('emailError', 'Please enter a valid email address.');
                 isValid = false;
             }
@@ -205,12 +222,12 @@ function validateQuestion(q) {
     if (!isValid && errorMessage) {
         displayError(q.id + 'Error', errorMessage);
     }
-    
+
     return isValid;
 }
 
 
-// Only clears the rotation interval as other timers are handled by clearAllTimers() (P2)
+// Only clears the rotation interval
 function cleanupIntervals() {
     if (appState.rotationInterval) {
         clearInterval(appState.rotationInterval);
@@ -225,22 +242,24 @@ function showQuestion(index) {
         const renderer = window.dataUtils.questionRenderers[q.type];
 
         questionContainer.innerHTML = renderer.render(q, appState.formData);
-        
+
         if (renderer.setupEvents) {
-            renderer.setupEvents(q, { 
-                handleNextQuestion: goNext, 
-                updateData: updateData 
+            renderer.setupEvents(q, {
+                handleNextQuestion: goNext,
+                updateData: updateData
             });
         }
 
         if (q.rotatingText) {
             rotateQuestionText(q);
         }
-        
+
         prevBtn.disabled = index === 0;
         nextBtn.textContent = (index === window.dataUtils.surveyQuestions.length - 1) ? 'Submit Survey' : 'Next';
         nextBtn.disabled = false;
-        
+
+        updateProgressBar(); // [NEW] Update progress bar on question change
+
     } catch (e) {
         console.error("Fatal Error during showQuestion render:", e);
         questionContainer.innerHTML = '<h2 class="text-xl font-bold text-red-600">A critical error occurred. Please refresh.</h2>';
@@ -249,14 +268,14 @@ function showQuestion(index) {
 
 function goNext() {
     const currentQuestion = window.dataUtils.surveyQuestions[appState.currentQuestionIndex];
-    
+
     if (!validateQuestion(currentQuestion)) {
-        return; 
+        return;
     }
 
     cleanupIntervals();
     clearErrors();
-    
+
     if (appState.currentQuestionIndex < window.dataUtils.surveyQuestions.length - 1) {
         appState.currentQuestionIndex++;
         saveState();
@@ -269,7 +288,7 @@ function goNext() {
 function goPrev() {
     if (appState.currentQuestionIndex > 0) {
         cleanupIntervals();
-        
+
         appState.currentQuestionIndex--;
         saveState();
         showQuestion(appState.currentQuestionIndex);
@@ -284,111 +303,132 @@ function goPrev() {
 /** * Processes the submission queue. Clears the queue only upon successful server sync.
  */
 async function syncData(showAdminFeedback = false) {
-    const submissionQueue = getSubmissionQueue(); 
-
-    if (submissionQueue.length === 0) {
+    // [MODIFIED] Implement sync lock to prevent concurrent runs
+    if (isSyncing) {
+        console.warn("Sync skipped: A sync operation is already in progress.");
         if (showAdminFeedback && syncStatusMessage) {
-            syncStatusMessage.textContent = 'No records to sync ✅';
-            setTimeout(() => syncStatusMessage.textContent = '', 3000);
+            syncStatusMessage.textContent = 'Sync is already running... ⏳';
         }
-        return true;
+        return;
     }
 
     let lastError = null;
+    let success = false;
+    const submissionQueue = getSubmissionQueue();
 
-    if (showAdminFeedback && syncStatusMessage) {
-        syncStatusMessage.textContent = `Syncing ${submissionQueue.length} records... ⏳`;
-    }
+    try {
+        isSyncing = true; // Set lock
 
-    const payload = {
-        submissions: submissionQueue 
-    };
-
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const response = await fetch('/api/submit-survey', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                throw new Error(`Server returned status: ${response.status}`);
-            }
-            
-            // SUCCESS: Clear the local queue and update admin panel
-            localStorage.removeItem('submissionQueue');
-            updateAdminCount(); 
-            
+        if (submissionQueue.length === 0) {
             if (showAdminFeedback && syncStatusMessage) {
-                syncStatusMessage.textContent = `Sync Successful (${submissionQueue.length} records cleared) ✅`;
+                syncStatusMessage.textContent = 'No records to sync ✅';
                 setTimeout(() => syncStatusMessage.textContent = '', 3000);
             }
             return true;
-            
-        } catch (error) {
-            lastError = error;
-            if (attempt < MAX_RETRIES) {
-                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+        }
+
+        if (showAdminFeedback && syncStatusMessage) {
+            syncStatusMessage.textContent = `Syncing ${submissionQueue.length} records... ⏳`;
+        }
+
+        const payload = {
+            submissions: submissionQueue
+        };
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const response = await fetch('/api/submit-survey', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned status: ${response.status}`);
+                }
+
+                // SUCCESS: Clear the local queue and update admin panel
+                localStorage.removeItem(STORAGE_KEY_QUEUE); // [MODIFIED] Use constant
+                updateAdminCount();
+
+                if (showAdminFeedback && syncStatusMessage) {
+                    syncStatusMessage.textContent = `Sync Successful (${submissionQueue.length} records cleared) ✅`;
+                    setTimeout(() => syncStatusMessage.textContent = '', 3000);
+                }
+                success = true;
+                return true;
+
+            } catch (error) {
+                lastError = error;
+                if (attempt < MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+                }
+            }
+        }
+    } finally {
+        isSyncing = false; // Release lock
+        if (!success) {
+            // Failure: Log and update admin counter (data remains in queue)
+            if (lastError) {
+                 console.error(`PERMANENT FAIL: Data sync failed. Error: ${lastError.message}`);
+            }
+            updateAdminCount();
+
+            if (showAdminFeedback && syncStatusMessage) {
+                syncStatusMessage.textContent = 'Manual Sync Failed ⚠️ (Check Console)';
             }
         }
     }
-
-    // Failure: Log and update admin counter (data remains in queue)
-    console.error(`PERMANENT FAIL: Data sync failed. Error: ${lastError.message}`);
-    updateAdminCount(); 
-    
-    if (showAdminFeedback && syncStatusMessage) {
-        syncStatusMessage.textContent = 'Manual Sync Failed ⚠️ (Check Console)';
-    }
     return false;
 }
+
 
 function autoSync() {
     syncData(false);
 }
 
 function submitSurvey() {
-    // P2: Clear all timers immediately to stop background activity (inactivity, periodic sync)
-    clearAllTimers(); 
+    clearAllTimers();
 
     // --- Step 1: Queue the Completed Survey ---
-    const submissionQueue = getSubmissionQueue(); 
-    
+    const submissionQueue = getSubmissionQueue();
+
     // Finalize data before queuing.
     appState.formData.timestamp = new Date().toISOString();
     appState.formData.sync_status = 'unsynced';
-    
+
     submissionQueue.push(appState.formData);
-    // Uses safeSetLocalStorage (P1)
-    safeSetLocalStorage('submissionQueue', submissionQueue);
+    safeSetLocalStorage(STORAGE_KEY_QUEUE, submissionQueue); // [MODIFIED] Use constant
+
+    // [NEW] Set progress bar to 100% on submission
+    if (progressBar) {
+        progressBar.style.width = '100%';
+    }
 
     // 1. Show thank you message immediately with initial countdown element
     questionContainer.innerHTML = '<h2 class="text-xl font-bold text-green-600">Thank you for completing the survey!</h2>' +
                                   '<p id="resetCountdown" class="mt-4 text-gray-500 text-lg font-semibold">Kiosk resetting in 5 seconds...</p>';
-    
-    prevBtn.disabled = true; 
-    nextBtn.disabled = true; 
-    
-    // 2. Start the visible countdown and the reliable reset (NEW LOGIC)
+
+    prevBtn.disabled = true;
+    nextBtn.disabled = true;
+
+    // 2. Start the visible countdown and the reliable reset
     let timeLeft = RESET_DELAY_MS / 1000;
-    
+
     const countdownInterval = setInterval(() => {
         timeLeft--;
         const countdownEl = document.getElementById('resetCountdown');
-        
+
         if (countdownEl) {
             countdownEl.textContent = `Kiosk resetting in ${timeLeft} seconds...`;
         }
 
         if (timeLeft <= 0) {
             clearInterval(countdownInterval);
-            
-            // P3: Ensure the next session gets a fresh UUID by forcing a full state rebuild.
-            appState.currentQuestionIndex = 0; 
-            
-            localStorage.removeItem('surveyAppState'); 
-            window.location.reload(); 
+
+            appState.currentQuestionIndex = 0;
+            localStorage.removeItem(STORAGE_KEY_STATE); // [MODIFIED] Use constant
+            window.location.reload();
         }
     }, 1000);
 }
@@ -399,42 +439,37 @@ function submitSurvey() {
 // ---------------------------------------------------------------------
 
 function resetInactivityTimer() {
-    // P2: Clear existing timers
     clearAllTimers();
 
     appState.inactivityTimer = setTimeout(() => {
-        
+
         const isInProgress = appState.currentQuestionIndex > 0;
-        
+
         if (isInProgress) {
-             console.log('Mid-survey inactivity detected. Auto-saving and resetting kiosk.');
-             
-             // --- Step 1: Queue the Abandoned Survey ---
-             const submissionQueue = getSubmissionQueue(); 
-             
-             // Finalize data before reset.
-             appState.formData.timestamp = new Date().toISOString();
-             appState.formData.sync_status = 'unsynced (inactivity)';
-             
-             submissionQueue.push(appState.formData);
-             // Uses safeSetLocalStorage (P1)
-             safeSetLocalStorage('submissionQueue', submissionQueue);
+            console.log('Mid-survey inactivity detected. Auto-saving and resetting kiosk.');
 
-             // --- Step 2: Fast Reset ---
-             // P3: Ensure the next session gets a fresh UUID
-             appState.currentQuestionIndex = 0; 
+            // --- Step 1: Queue the Abandoned Survey ---
+            const submissionQueue = getSubmissionQueue();
 
-             localStorage.removeItem('surveyAppState');
-             window.location.reload();
+            // Finalize data before reset.
+            appState.formData.timestamp = new Date().toISOString();
+            appState.formData.sync_status = 'unsynced (inactivity)';
+
+            submissionQueue.push(appState.formData);
+            safeSetLocalStorage(STORAGE_KEY_QUEUE, submissionQueue); // [MODIFIED] Use constant
+
+            // --- Step 2: Fast Reset ---
+            appState.currentQuestionIndex = 0;
+            localStorage.removeItem(STORAGE_KEY_STATE); // [MODIFIED] Use constant
+            window.location.reload();
         } else {
-             // On landing screen, rely on the periodic sync only.
-             autoSync();
+            // On landing screen, rely on the periodic sync only.
+            autoSync();
         }
     }, INACTIVITY_TIMEOUT_MS);
 }
 
 function startPeriodicSync() {
-    // P2: Uses clearAllTimers() to clear the syncTimer before starting a new one.
     if (appState.syncTimer) clearInterval(appState.syncTimer);
     appState.syncTimer = setInterval(autoSync, SYNC_INTERVAL_MS);
 }
@@ -443,9 +478,9 @@ function rotateQuestionText(q) {
     let idx = 0;
     const labelEl = document.getElementById('rotatingQuestion');
     if (!labelEl) return;
-    
-    cleanupIntervals(); // Clears only rotation interval
-    
+
+    cleanupIntervals();
+
     appState.rotationInterval = setInterval(() => {
         idx = (idx + 1) % q.rotatingText.length;
         labelEl.textContent = q.rotatingText[idx];
@@ -458,33 +493,27 @@ function rotateQuestionText(q) {
 // ---------------------------------------------------------------------
 
 function setupAdminAccess() {
-    // 5-Click Access Handler
     mainTitle.addEventListener('click', () => {
         appState.adminClickCount++;
         if (appState.adminClickCount >= 5) {
             toggleAdminPanel(true);
-            appState.adminClickCount = 0; 
+            appState.adminClickCount = 0;
         }
     });
 
-    // Hide Button
     hideAdminButton.addEventListener('click', () => {
         toggleAdminPanel(false);
     });
 
-    // Manual Sync Button
     syncButton.addEventListener('click', () => {
-        syncData(true); 
+        syncData(true);
     });
-    
-    // Clear Local Data Button (Clears In-Progress and the Queue)
+
     adminClearButton.addEventListener('click', () => {
         if (confirm("WARNING: Are you sure you want to delete ALL local survey data (Queue AND In-Progress)? This is permanent.")) {
-            // P2: Clear all timers before reload
             clearAllTimers();
-            
-            localStorage.removeItem('surveyAppState');
-            localStorage.removeItem('submissionQueue'); 
+            localStorage.removeItem(STORAGE_KEY_STATE); // [MODIFIED] Use constant
+            localStorage.removeItem(STORAGE_KEY_QUEUE); // [MODIFIED] Use constant
             window.location.reload();
         }
     });
@@ -493,11 +522,11 @@ function setupAdminAccess() {
 function toggleAdminPanel(show) {
     if (show) {
         adminControls.classList.remove('hidden');
-        updateAdminCount(); 
-        if (syncStatusMessage) syncStatusMessage.textContent = ''; 
+        updateAdminCount();
+        if (syncStatusMessage) syncStatusMessage.textContent = '';
     } else {
         adminControls.classList.add('hidden');
-        appState.adminClickCount = 0; 
+        appState.adminClickCount = 0;
     }
 }
 
@@ -507,25 +536,27 @@ function toggleAdminPanel(show) {
 // ---------------------------------------------------------------------
 
 document.addEventListener('DOMContentLoaded', () => {
-    
+
     // 1. Assign ALL DOM elements
     questionContainer = document.getElementById('questionContainer');
     nextBtn = document.getElementById('nextBtn');
     prevBtn = document.getElementById('prevBtn');
-    mainTitle = document.getElementById('mainTitle'); 
-    
+    mainTitle = document.getElementById('mainTitle');
+    progressBar = document.getElementById('progressBar'); // [NEW] Progress bar element
+
     // Admin elements
-    adminControls = document.getElementById('adminControls'); 
-    syncButton = document.getElementById('syncButton'); 
-    adminClearButton = document.getElementById('adminClearButton'); 
+    adminControls = document.getElementById('adminControls');
+    syncButton = document.getElementById('syncButton');
+    adminClearButton = document.getElementById('adminClearButton');
     hideAdminButton = document.getElementById('hideAdminButton');
-    unsyncedCountDisplay = document.getElementById('unsyncedCountDisplay'); 
-    syncStatusMessage = document.getElementById('syncStatusMessage'); 
-    
+    unsyncedCountDisplay = document.getElementById('unsyncedCountDisplay');
+    syncStatusMessage = document.getElementById('syncStatusMessage');
+
     // Check critical public elements
     if (!questionContainer || !nextBtn || !prevBtn || !mainTitle) {
         console.error("CRITICAL ERROR: Missing essential HTML elements. Survey cannot start.");
-        return; 
+        document.body.innerHTML = '<h1 style="color: red; text-align: center; padding-top: 50px;">Application Error: Could not load survey.</h1>'
+        return;
     }
 
     // 2. Setup public interaction listeners
@@ -536,12 +567,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Setup administrator access
     if (adminControls) {
-        adminControls.classList.add('hidden'); 
+        adminControls.classList.add('hidden');
         setupAdminAccess();
     } else {
-          console.warn("Admin controls container 'adminControls' is missing. Manual features disabled.");
+        console.warn("Admin controls container 'adminControls' is missing. Manual features disabled.");
     }
-    
+
     // 4. Start the application flow
     showQuestion(appState.currentQuestionIndex);
     resetInactivityTimer();
