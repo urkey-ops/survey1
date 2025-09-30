@@ -124,7 +124,7 @@ export default async function handler(request, response) {
         return response.status(200).json({ 
             success: true,
             message: `${syncedIds.length} submissions processed.`,
-            **successfulIds**: syncedIds // Client-side V11 expects 'successfulIds'
+            successfulIds: syncedIds // Client-side V11 expects 'successfulIds'
         });
 
     } catch (error) {
@@ -138,7 +138,7 @@ export default async function handler(request, response) {
         return response.status(500).json({ 
             success: false,
             message: 'Internal Server Error during sheet append. Data retained locally.',
-            **successfulIds**: []
+            successfulIds: []
         });
     }
 }
