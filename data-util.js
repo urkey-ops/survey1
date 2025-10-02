@@ -1,4 +1,4 @@
-// --- data-util.js (Version 13) ---
+// --- data-util.js (Hardened Version 14) ---
 window.dataUtils = (function() {
 
     // Configuration data structure
@@ -243,7 +243,7 @@ window.dataUtils = (function() {
         'radio': {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="radio-group grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
+                <div class="age-radio-group grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
                     ${q.options.map(opt => `
                         <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''} aria-checked="${data[q.name] === opt.value}">
                         <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg" role="radio">${opt.label}</label>
@@ -251,7 +251,7 @@ window.dataUtils = (function() {
                 </div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
-                const container = document.querySelector('.radio-group');
+                const container = document.querySelector('.age-radio-group');
                 if (!container) {
                     console.warn(`[radio] Container not found for question '${q.name}'`);
                     return;
