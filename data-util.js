@@ -1,4 +1,4 @@
-// --- data-util.js (Updated Version) ---
+// --- data-util.js (Version 13) ---
 window.dataUtils = (function() {
 
     // Configuration data structure
@@ -94,7 +94,14 @@ window.dataUtils = (function() {
                 <textarea id="${q.id}" name="${q.name}" rows="4" class="shadow-sm resize-none appearance-none border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${q.placeholder}" ${q.required ? 'required' : ''}>${data[q.name] || ''}</textarea>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden"></span>`,
             setupEvents: (q, { updateData }) => {
-                document.getElementById(q.id).addEventListener('input', (e) => {
+                const element = document.getElementById(q.id);
+                if (!element) {
+                    console.warn(`[textarea] Element with id '${q.id}' not found`);
+                    return;
+                }
+                
+                // Use event delegation on the element itself to avoid duplicates
+                element.addEventListener('input', (e) => {
                     updateData(q.name, e.target.value);
                 });
             }
@@ -105,20 +112,27 @@ window.dataUtils = (function() {
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
                 <div class="emoji-radio-group flex justify-around items-center space-x-4" role="radiogroup" aria-labelledby="${q.id}Label">
                     ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer">
-                            <span class="text-4xl sm:text-5xl mb-2">${opt.emoji}</span>
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''} aria-checked="${data[q.name] === opt.value}">
+                        <label for="${q.id + opt.value}" class="flex flex-col items-center p-4 sm:p-6 bg-white border-2 border-transparent rounded-full hover:bg-gray-50 transition-all duration-300 cursor-pointer" role="radio" aria-label="${opt.label}">
+                            <span class="text-4xl sm:text-5xl mb-2" aria-hidden="true">${opt.emoji}</span>
                             <span class="text-sm font-medium text-gray-600">${opt.label}</span>
                         </label>
                     `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
+                // Use event delegation on the container to avoid duplicate listeners
+                const container = document.querySelector('.emoji-radio-group');
+                if (!container) {
+                    console.warn(`[emoji-radio] Container not found for question '${q.name}'`);
+                    return;
+                }
+                
+                container.addEventListener('change', (e) => {
+                    if (e.target.name === q.name) {
                         updateData(q.name, e.target.value);
                         setTimeout(() => handleNextQuestion(), 50);
-                    });
+                    }
                 });
             }
         },
@@ -126,20 +140,26 @@ window.dataUtils = (function() {
         'number-scale': {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="number-scale-group grid grid-cols-5 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                <div class="number-scale-group grid grid-cols-5 gap-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
                     ${Array.from({ length: q.max }, (_, i) => i + 1).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-white border-2 border-transparent rounded-full font-bold text-gray-700 hover:bg-gray-50"><span>${num}</span></label>
+                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''} aria-checked="${parseInt(data[q.name]) === num}">
+                        <label for="${q.id + num}" class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 bg-white border-2 border-transparent rounded-full font-bold text-gray-700 hover:bg-gray-50" role="radio" aria-label="Rating ${num}"><span>${num}</span></label>
                     `).join('')}
                 </div>
                 <div class="flex justify-between text-sm mt-2 text-gray-500"><span>${q.labels.min}</span><span>${q.labels.max}</span></div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
+                const container = document.querySelector('.number-scale-group');
+                if (!container) {
+                    console.warn(`[number-scale] Container not found for question '${q.name}'`);
+                    return;
+                }
+                
+                container.addEventListener('change', (e) => {
+                    if (e.target.name === q.name) {
                         updateData(q.name, e.target.value);
                         setTimeout(() => handleNextQuestion(), 50);
-                    });
+                    }
                 });
             }
         },
@@ -147,19 +167,25 @@ window.dataUtils = (function() {
         'star-rating': {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                <div class="star-rating flex flex-row-reverse justify-center mt-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
                     ${Array.from({ length: q.max }, (_, i) => q.max - i).map(num => `
-                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''}>
-                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer">★</label>
+                        <input type="radio" id="${q.id + num}" name="${q.name}" value="${num}" class="visually-hidden" ${parseInt(data[q.name]) === num ? 'checked' : ''} aria-checked="${parseInt(data[q.name]) === num}">
+                        <label for="${q.id + num}" class="star text-4xl sm:text-5xl pr-1 cursor-pointer" role="radio" aria-label="${num} stars">★</label>
                     `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
+                const container = document.querySelector('.star-rating');
+                if (!container) {
+                    console.warn(`[star-rating] Container not found for question '${q.name}'`);
+                    return;
+                }
+                
+                container.addEventListener('change', (e) => {
+                    if (e.target.name === q.name) {
                         updateData(q.name, e.target.value);
                         setTimeout(() => handleNextQuestion(), 50);
-                    });
+                    }
                 });
             }
         },
@@ -167,10 +193,10 @@ window.dataUtils = (function() {
         'radio-with-other': {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="location-radio-group grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                <div class="location-radio-group grid grid-cols-2 sm:grid-cols-3 gap-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
                     ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''} aria-checked="${data[q.name] === opt.value}">
+                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg" role="radio">${opt.label}</label>
                     `).join('')}
                 </div>
                 <div id="other-location-container" class="mt-4 ${data[q.name] === 'Other' ? '' : 'hidden'}">
@@ -179,42 +205,63 @@ window.dataUtils = (function() {
                 </div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
+                const container = document.querySelector('.location-radio-group');
+                const otherContainer = document.getElementById('other-location-container');
                 const otherInput = document.getElementById('other_location_text');
+                
+                if (!container) {
+                    console.warn(`[radio-with-other] Container not found for question '${q.name}'`);
+                    return;
+                }
 
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
-                        const otherContainer = document.getElementById('other-location-container');
+                // Handle radio button changes with event delegation
+                container.addEventListener('change', (e) => {
+                    if (e.target.name === q.name) {
                         updateData(q.name, e.target.value);
+                        
+                        if (!otherContainer) return;
                         
                         if (e.target.value === 'Other') {
                             otherContainer.classList.remove('hidden');
-                            otherInput.oninput = (event) => updateData('other_location', event.target.value);
                         } else {
                             otherContainer.classList.add('hidden');
                             updateData('other_location', '');
                             setTimeout(() => handleNextQuestion(), 50);
                         }
-                    });
+                    }
                 });
+
+                // Handle "Other" text input separately
+                if (otherInput) {
+                    otherInput.addEventListener('input', (e) => {
+                        updateData('other_location', e.target.value);
+                    });
+                }
             }
         },
 
         'radio': {
             render: (q, data) => `
                 <label id="${q.id}Label" class="block text-gray-700 font-semibold mb-2">${q.question}</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label">
+                <div class="radio-group grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-labelledby="${q.id}Label" data-question-name="${q.name}">
                     ${q.options.map(opt => `
-                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''}>
-                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg">${opt.label}</label>
+                        <input type="radio" id="${q.id + opt.value}" name="${q.name}" value="${opt.value}" class="visually-hidden" ${data[q.name] === opt.value ? 'checked' : ''} aria-checked="${data[q.name] === opt.value}">
+                        <label for="${q.id + opt.value}" class="px-3 py-3 text-center text-sm sm:text-base font-medium border-2 border-gray-300 rounded-lg" role="radio">${opt.label}</label>
                     `).join('')}
                 </div>
                 <span id="${q.id}Error" class="error-message text-red-500 text-sm hidden mt-2 block"></span>`,
             setupEvents: (q, { handleNextQuestion, updateData }) => {
-                document.querySelectorAll(`input[name="${q.name}"]`).forEach(radio => {
-                    radio.addEventListener('change', e => {
+                const container = document.querySelector('.radio-group');
+                if (!container) {
+                    console.warn(`[radio] Container not found for question '${q.name}'`);
+                    return;
+                }
+                
+                container.addEventListener('change', (e) => {
+                    if (e.target.name === q.name) {
                         updateData(q.name, e.target.value);
                         setTimeout(() => handleNextQuestion(), 50);
-                    });
+                    }
                 });
             }
         },
@@ -223,7 +270,7 @@ window.dataUtils = (function() {
             render: (q, data) => {
                 const isChecked = data['newsletterConsent'] === 'Yes';
                 return `
-                <div class="space-y-4">
+                <div class="space-y-4" id="contact-form-container">
                     <div>
                         <label for="name" class="block text-gray-700 font-semibold mb-2">Name</label>
                         <input type="text" id="name" name="name" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your name" value="${data['name'] || ''}">
@@ -235,34 +282,51 @@ window.dataUtils = (function() {
                     </div>
                     <div id="email-field-container" class="${isChecked ? 'visible-fields' : 'hidden-fields'}">
                         <label for="email" class="block text-gray-700 font-semibold mb-2">Email</label>
-                        <input type="email" id="email" name="email" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your email" value="${data['email'] || ''}">
+                        <input type="email" id="email" name="email" class="shadow-sm border border-gray-300 rounded-lg w-full py-3 px-4 text-gray-700" placeholder="Enter your email" value="${data['email'] || ''}" ${isChecked ? 'required' : ''}>
                         <span id="emailError" class="error-message text-red-500 text-sm hidden"></span>
                     </div>
                 </div>`;
             },
             setupEvents: (q, { updateData }) => {
-                const nameInput = document.getElementById('name');
-                const checkbox = document.getElementById('newsletterConsent');
-                const emailInput = document.getElementById('email');
-                const emailContainer = document.getElementById('email-field-container');
+                const container = document.getElementById('contact-form-container');
+                if (!container) {
+                    console.warn(`[custom-contact] Container not found`);
+                    return;
+                }
 
-                if (checkbox.checked) emailInput.setAttribute('required', 'required');
+                // Use event delegation for all inputs within the contact form
+                container.addEventListener('input', (e) => {
+                    const target = e.target;
+                    
+                    if (target.id === 'name') {
+                        updateData('name', target.value);
+                    } else if (target.id === 'email') {
+                        updateData('email', target.value);
+                    }
+                });
 
-                nameInput.addEventListener('input', (e) => updateData('name', e.target.value));
-                emailInput.addEventListener('input', (e) => updateData('email', e.target.value));
+                // Handle checkbox separately since it's a 'change' event
+                container.addEventListener('change', (e) => {
+                    const target = e.target;
+                    
+                    if (target.id === 'newsletterConsent') {
+                        const emailContainer = document.getElementById('email-field-container');
+                        const emailInput = document.getElementById('email');
+                        
+                        if (!emailContainer || !emailInput) return;
+                        
+                        updateData('newsletterConsent', target.checked ? 'Yes' : 'No');
 
-                checkbox.addEventListener('change', (e) => {
-                    updateData('newsletterConsent', e.target.checked ? 'Yes' : 'No');
-
-                    if (e.target.checked) {
-                        emailContainer.classList.remove('hidden-fields');
-                        emailContainer.classList.add('visible-fields');
-                        emailInput.setAttribute('required', 'required');
-                    } else {
-                        emailContainer.classList.remove('visible-fields');
-                        emailContainer.classList.add('hidden-fields');
-                        emailInput.removeAttribute('required');
-                        updateData('email', '');
+                        if (target.checked) {
+                            emailContainer.classList.remove('hidden-fields');
+                            emailContainer.classList.add('visible-fields');
+                            emailInput.setAttribute('required', 'required');
+                        } else {
+                            emailContainer.classList.remove('visible-fields');
+                            emailContainer.classList.add('hidden-fields');
+                            emailInput.removeAttribute('required');
+                            updateData('email', '');
+                        }
                     }
                 });
             }
