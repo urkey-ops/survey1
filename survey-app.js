@@ -755,15 +755,27 @@ const STORAGE_KEY_STATE = 'surveyAppState';
         });
         
         // [IMPROVEMENT #3] Visibility change handler - pause timers when hidden
+        // CRITICAL: Only pause if page is truly hidden for extended period (e.g., screen saver)
+        // Don't pause for momentary visibility changes
+        let visibilityTimeout;
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                console.log('[VISIBILITY] Kiosk hidden - pausing timers');
-                isKioskVisible = false;
-                clearAllTimers(); // Pause everything
+                // Only pause after 5 seconds of being hidden (avoid false triggers)
+                visibilityTimeout = setTimeout(() => {
+                    console.log('[VISIBILITY] Kiosk hidden for 5s+ - pausing timers');
+                    isKioskVisible = false;
+                    clearAllTimers();
+                }, 5000);
             } else {
-                console.log('[VISIBILITY] Kiosk visible - resuming timers');
-                isKioskVisible = true;
-                resetInactivityTimer(); // Resume when visible again
+                // Clear the timeout if page becomes visible again quickly
+                clearTimeout(visibilityTimeout);
+                
+                // Only resume if we were actually paused
+                if (!isKioskVisible) {
+                    console.log('[VISIBILITY] Kiosk visible - resuming timers');
+                    isKioskVisible = true;
+                    resetInactivityTimer();
+                }
             }
         });
     });
