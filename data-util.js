@@ -59,8 +59,6 @@ window.dataUtils = (function() {
                 { value: 'Greater Atlanta Area', label: 'Greater Atlanta Area' },
                 { value: 'Georgia (outside Atlanta)', label: 'Georgia (outside Atlanta)' },
                 { value: 'United States (outside Georgia)', label: 'United States (outside Georgia)' },
-                { value: 'Canada', label: 'Canada' },
-                { value: 'India', label: 'India' },
                 { value: 'Other', label: 'Other' }
             ],
             required: true
