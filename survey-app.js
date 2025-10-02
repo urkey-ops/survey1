@@ -93,6 +93,9 @@ const STORAGE_KEY_STATE = 'surveyAppState';
     // [NEW] Store bound event handlers for proper cleanup
     let boundResetInactivityTimer = null;
 
+    // [NEW] Track if kiosk is currently visible/active
+    let isKioskVisible = true;
+
     // ---------------------------------------------------------------------
     // --- UTILITIES & STATE MANAGEMENT ---
     // ---------------------------------------------------------------------
@@ -395,6 +398,12 @@ const STORAGE_KEY_STATE = 'surveyAppState';
         try {
             isSyncing = true; // Set lock
 
+            // [IMPROVEMENT #4] Update button state to show loading
+            if (showAdminFeedback && syncButton) {
+                syncButton.disabled = true;
+                syncButton.textContent = 'Syncing...';
+            }
+
             if (submissionQueue.length === 0) {
                 if (showAdminFeedback && syncStatusMessage) {
                     syncStatusMessage.textContent = 'No records to sync ✅';
@@ -464,6 +473,13 @@ const STORAGE_KEY_STATE = 'surveyAppState';
             }
         } finally {
             isSyncing = false; // Release lock
+            
+            // [IMPROVEMENT #4] Restore button state
+            if (showAdminFeedback && syncButton) {
+                syncButton.disabled = false;
+                syncButton.textContent = 'Sync Data';
+            }
+            
             if (!success) {
                 // Failure: Log and update admin counter (data remains in queue)
                 if (lastError) {
@@ -560,6 +576,7 @@ const STORAGE_KEY_STATE = 'surveyAppState';
 
     /**
      * [IMPROVED] No longer re-adds event listeners (they're added once in init)
+     * [IMPROVEMENT #3] Respects visibility state - only restarts if kiosk is visible
      */
     function resetInactivityTimer() {
         // Clear existing timers
@@ -568,6 +585,12 @@ const STORAGE_KEY_STATE = 'surveyAppState';
         }
         if (appState.syncTimer) {
             clearInterval(appState.syncTimer);
+        }
+        
+        // [IMPROVEMENT #3] Don't start timers if kiosk is hidden
+        if (!isKioskVisible) {
+            console.log('[VISIBILITY] Kiosk hidden - timers not started');
+            return;
         }
         
         // Start periodic sync
@@ -720,6 +743,29 @@ const STORAGE_KEY_STATE = 'surveyAppState';
         setInterval(() => {
             console.log(`[HEARTBEAT] Kiosk alive. Queue: ${countUnsyncedRecords()} | Current Q: ${appState.currentQuestionIndex}`);
         }, 15 * 60 * 1000);
+        
+        // [IMPROVEMENT #1] Network status detection
+        window.addEventListener('online', () => {
+            console.log('[NETWORK] Connection restored. Attempting sync...');
+            syncData(false);
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('[NETWORK] Connection lost. Operating in offline mode.');
+        });
+        
+        // [IMPROVEMENT #3] Visibility change handler - pause timers when hidden
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('[VISIBILITY] Kiosk hidden - pausing timers');
+                isKioskVisible = false;
+                clearAllTimers(); // Pause everything
+            } else {
+                console.log('[VISIBILITY] Kiosk visible - resuming timers');
+                isKioskVisible = true;
+                resetInactivityTimer(); // Resume when visible again
+            }
+        });
     });
 
 })(); // END OF IIFE: Immediately executes the function
