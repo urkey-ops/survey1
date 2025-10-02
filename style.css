@@ -1,4 +1,4 @@
-/* --- kiosk-survey.css (Cleaned & Simplified) --- */
+/* --- kiosk-survey.css (Fixed & Cleaned) --- */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
 :root {
@@ -42,6 +42,16 @@ label:focus-within {
 button:disabled {
   background-color: var(--disabled-bg) !important;
   color: var(--disabled-text) !important;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Ensure the ID selector matches the button for maximum specificity */
+#nextBtn:disabled {
+  background-color: var(--disabled-bg) !important;
+  color: var(--disabled-text) !important;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 /* --- Next Button --- */
@@ -52,11 +62,13 @@ button:disabled {
 /* --- Selection Styles --- */
 .emoji-radio-group label,
 .number-scale-group label,
-.location-radio-group label {
+.location-radio-group label,
+.age-radio-group label {
   transition: all 0.2s ease-in-out;
   cursor: pointer;
 }
 
+/* Emoji and Number Scale Selected State */
 .emoji-radio-group input:checked + label,
 .number-scale-group input:checked + label {
   border-color: var(--focus-blue);
@@ -66,7 +78,9 @@ button:disabled {
   color: #333;
 }
 
-.location-radio-group input:checked + label {
+/* Location and Age Radio Selected State */
+.location-radio-group input:checked + label,
+.age-radio-group input:checked + label {
   background-color: var(--sewa-orange);
   color: white;
   border-color: var(--sewa-orange);
@@ -77,13 +91,16 @@ button:disabled {
 .star-rating input {
   display: none;
 }
+
 .star-rating label.star {
   color: #ccc;
   transition: color 0.2s;
 }
+
 .star-rating input:checked ~ label.star {
   color: #ffc107;
 }
+
 .star-rating label.star:hover,
 .star-rating label.star:hover ~ label.star {
   color: #ffc107;
@@ -97,6 +114,7 @@ button:disabled {
   pointer-events: none;
   transition: opacity 0.4s ease-in-out, max-height 0.4s ease-in-out;
 }
+
 .visible-fields {
   opacity: 1;
   max-height: 500px;
@@ -109,6 +127,7 @@ button:disabled {
   border-color: var(--error-red) !important;
   box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.5) !important;
 }
+
 .error-message {
   display: block;
   color: var(--error-red);
@@ -120,13 +139,16 @@ button:disabled {
 .checkmark-container {
   min-height: 300px;
 }
+
 .checkmark-circle {
   background-color: #22c55e;
   animation: bounceIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.27);
 }
+
 .checkmark-icon {
   font-weight: bold;
 }
+
 .spinner {
   border-radius: 50%;
   border: 4px solid rgba(255, 255, 255, 0.3);
@@ -142,14 +164,7 @@ button:disabled {
   60% { transform: scale(1.1); opacity: 1; }
   100% { transform: scale(1); }
 }
+
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-
-/* Ensure the ID selector is used to match the button's ID for maximum specificity */
-#nextBtn:disabled {
-    background-color: var(--disabled-bg) !important; /* e.g., #e5e7eb (gray-200) */
-    color: var(--disabled-text) !important;      /* e.g., #9ca3af (gray-400) */
-    cursor: not-allowed;
-    opacity: 1; /* Opacity is no longer needed if using solid disabled colors */
 }
